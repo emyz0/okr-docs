@@ -1,58 +1,54 @@
-export const runtime = 'nodejs'
+// Next.js API Route: /api/rag/ingest endpoint'i
+// PDF olmadan direkt metin gönderilerek işleme yapar
+// Kullanım: Ham metin, API yanıtları, web içeriği vs. yüklemek için
 
-import { NextRequest, NextResponse } from 'next/server'
-import * as pdfParse from 'pdf-parse'
-import mammoth from 'mammoth'
-
-// 🔗 chain.ts içinden GERÇEK ingest fonksiyonunu getiriyoruz
-import { ingestDocument as ingestToPinecone } from '@lib/rag/chain.ts'
+import { NextRequest, NextResponse } from "next/server";
+import { pool } from "@/lib/rag/db";
+import { embeddings, textSplitter } from "@/lib/rag/chain";
 
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData()
-    const files = formData.getAll('files') as File[]
-    const userId = formData.get('userId')?.toString() || 'default-user'
+    // Request body'den parametreleri oku
+    // text: İşlenecek metin
+    // metadata: Ekstra bilgiler (kaynak, kategori vs.)
+    // userId: Hangi kullanıcı için veri yüklüyorsa
+    const { text, metadata, userId } = await req.json();
 
-    if (!files || files.length === 0) {
-      return NextResponse.json({ error: 'Dosya bulunamadı' }, { status: 400 })
+    // Validasyon: text ve userId zorunlu
+    if (!text || !userId) {
+      return NextResponse.json(
+        { error: "text ve userId gerekli" },
+        { status: 400 }
+      );
     }
 
-    let totalChunks = 0
+    // Metni chunk'lara böl
+    // /upload route'unda PDF loader açıkça chunk'ladığı için
+    // burada textSplitter kullanıyoruz (aynı ayarlarla)
+    const chunks = await textSplitter.splitText(text);
 
-    for (const file of files) {
-      const fileType = file.name.split('.').pop()?.toLowerCase()
-      const buffer = Buffer.from(await file.arrayBuffer())
-      let text = ''
+    // Her chunk'ı işle ve DB'ye kaydet
+    for (const chunk of chunks) {
+      // Chunk'ı embedding modeline gönder (vektöre dönüştür)
+      const emb = await embeddings.embedQuery(chunk);
 
-      if (fileType === 'pdf') {
-        const data = await pdfParse.default(buffer)
-        text = data.text
-      } else if (fileType === 'docx') {
-        const result = await mammoth.extractRawText({ buffer })
-        text = result.value
-      } else if (fileType === 'txt') {
-        text = buffer.toString()
-      } else {
-        continue
-      }
-
-      if (text && text.trim().length > 50) {
-        // 🔥 artık Pinecone’a yazıyoruz
-        const result = await ingestToPinecone({
-          text,
-          metadata: { fileName: file.name, fileType, fileSize: file.size },
-          userId,
-        })
-        totalChunks += result.chunks
-      }
+      // Veritabanına insert et
+      // Fark: Burada embedding direkt array string'i gönderiliyor
+      // (upload/route.ts'de JSON.stringify kullanıyor)
+      await pool.query(
+        `INSERT INTO public.documents (user_id, content, metadata, embedding)
+         VALUES ($1, $2, $3, $4)`,
+        [userId, chunk, JSON.stringify(metadata), `[${emb.join(",")}]`]
+      );
     }
 
-    return NextResponse.json({
-      success: true,
-      message: `📁 ${files.length} dosya yüklendi • Toplam ${totalChunks} parça oluşturuldu.`,
-    })
+    // Başarı cevabı: Kaç chunk işlendiğini göster
+    return NextResponse.json({ success: true, chunks: chunks.length });
   } catch (error: any) {
-    console.error('Ingest API hatası:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error("Ingest hatası:", error);
+    return NextResponse.json(
+      { error: error.message || "İşleme hatası" },
+      { status: 500 }
+    );
   }
 }

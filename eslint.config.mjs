@@ -16,3 +16,6 @@ const eslintConfig = defineConfig([
 ]);
 
 export default eslintConfig;
+
+
+// kod kalitesini kontrol eder.
