@@ -66,22 +66,50 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ===== RERANKING: COHERE API İLE EN İLGİLİ KAYNAKLAR SEÇ =====
-    // Vector similarity iyi sonuç verse de, Cohere reranking daha doğru sonuçlar verir
+    // ===== RERANKING: QWEN3 RERANKER-4B İLE EN İLGİLİ KAYNAKLAR SEÇ =====
+    // Vector similarity iyi sonuç verse de, Qwen reranking daha doğru sonuçlar verir
     // 10 dokuman içinden gerçekten soruya cevap verecek olanları seç
     console.log("🔄 Reranking başladı...");
-    const rerankInput = {
-      query: question,
-      // Illk 10 dokümantı reranking için hazırla
-      documents: result.rows.map((r: any, i: number) => ({
-        id: i,
-        // Reranking için metni 500 karakterle sınırla (API'ya az veri gönder)
-        text: r.content.substring(0, 500),
-      })),
-    };
-
-    // Cohere API'ye gönder ve en ilgili 10'u geri al
-    const rerankResults = await rerankDocuments(rerankInput, Math.min(result.rows.length, 10));
+    
+    let rerankResults: any[] = [];
+    
+    try {
+      // Qwen local server'a gönder
+      const qwenResponse = await fetch("http://localhost:8000/rerank", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: question,
+          documents: result.rows.map((r: any) => r.content.substring(0, 500)),
+          top_k: Math.min(result.rows.length, 10),
+        }),
+      });
+      
+      if (!qwenResponse.ok) {
+        throw new Error(`Qwen server hatası: ${qwenResponse.status}`);
+      }
+      
+      const qwenData = await qwenResponse.json();
+      // Qwen'den gelen sonuçları NextResponse formatına dönüştür
+      rerankResults = qwenData.ranked_documents.map((doc: any) => ({
+        index: doc.index,
+        relevance_score: doc.score,
+      }));
+      
+      console.log("✅ Qwen reranker başarılı");
+    } catch (qwenError: any) {
+      console.warn("⚠️ Qwen reranker kullanılamadı, fallback to Cohere:", qwenError.message);
+      
+      // Fallback: Cohere API'yi kullan
+      const rerankInput = {
+        query: question,
+        documents: result.rows.map((r: any, i: number) => ({
+          id: i,
+          text: r.content.substring(0, 500),
+        })),
+      };
+      rerankResults = await rerankDocuments(rerankInput, Math.min(result.rows.length, 10));
+    }
 
     // ===== HER PDF'DEN KAYNAKLAR SEÇ =====
     // Amaç: Her PDF'den en az 1 dokuman alsın (tüm kaynaklar temsil edilsin)

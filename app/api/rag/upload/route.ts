@@ -69,6 +69,34 @@ export async function POST(req: NextRequest) {
           const loader = new PDFLoader(tempPath)
           docs = await loader.load()
           console.log(`📑 PDF: ${file.name} - ${docs.length} sayfa`)
+          
+          // 🖼️ OCR ile görselleri de oku
+          try {
+            const { extractOCRFromPdf } = await import('@/lib/rag/pdf-image-ocr')
+            const ocrResults = await extractOCRFromPdf(tempPath, 20) // İlk 20 sayfa
+            
+            if (ocrResults.length > 0) {
+              console.log(`✅ OCR: ${ocrResults.length} sayfadan metin çıkarıldı`)
+              
+              // OCR sonuçlarını dokümanlara ekle
+              ocrResults.forEach((ocr) => {
+                docs.push({
+                  pageContent: `[OCR - Sayfa ${ocr.pageNum}]\n${ocr.text}`,
+                  metadata: {
+                    source: file.name,
+                    type: 'ocr',
+                    page: ocr.pageNum,
+                    confidence: ocr.confidence,
+                    has_images: true
+                  }
+                })
+              })
+              
+              console.log(`📊 OCR chunk'ları eklendi: toplam ${docs.length} dokuman`)
+            }
+          } catch (ocrError) {
+            console.warn(`⚠️  OCR hatası (devam etme): ${ocrError}`)
+          }
         } 
         else if (ext === '.xlsx' || ext === '.xls') {
           // Excel işleme
