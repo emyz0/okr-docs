@@ -70,32 +70,27 @@ export async function POST(req: NextRequest) {
           docs = await loader.load()
           console.log(`📑 PDF: ${file.name} - ${docs.length} sayfa`)
           
-          // 🖼️ OCR ile görselleri de oku
+          // 🖼️ VLM ile görselleri ve tabloları analiz et
           try {
-            const { extractOCRFromPdf } = await import('@/lib/rag/pdf-image-ocr')
-            const ocrResults = await extractOCRFromPdf(tempPath, 20) // İlk 20 sayfa
+            const { extractContentWithVLM, formatVLMChunks } = await import('@/lib/rag/pdf-vlm-analyzer')
+            const vlmResults = await extractContentWithVLM(tempPath, 20, file.name) // İlk 20 sayfa
             
-            if (ocrResults.length > 0) {
-              console.log(`✅ OCR: ${ocrResults.length} sayfadan metin çıkarıldı`)
+            if (vlmResults.length > 0) {
+              console.log(`✅ VLM: ${vlmResults.length} sayfadan analiz yapıldı`)
               
-              // OCR sonuçlarını dokümanlara ekle
-              ocrResults.forEach((ocr) => {
+              // VLM sonuçlarını dokümanlara ekle
+              const vlmChunks = await formatVLMChunks(vlmResults, file.name)
+              vlmChunks.forEach((chunk) => {
                 docs.push({
-                  pageContent: `[OCR - Sayfa ${ocr.pageNum}]\n${ocr.text}`,
-                  metadata: {
-                    source: file.name,
-                    type: 'ocr',
-                    page: ocr.pageNum,
-                    confidence: ocr.confidence,
-                    has_images: true
-                  }
+                  pageContent: chunk.content,
+                  metadata: chunk.metadata
                 })
               })
               
-              console.log(`📊 OCR chunk'ları eklendi: toplam ${docs.length} dokuman`)
+              console.log(`📊 VLM chunk'ları eklendi: toplam ${docs.length} dokuman`)
             }
-          } catch (ocrError) {
-            console.warn(`⚠️  OCR hatası (devam etme): ${ocrError}`)
+          } catch (vlmError) {
+            console.warn(`⚠️ VLM hatası (devam etme): ${vlmError}`)
           }
         } 
         else if (ext === '.xlsx' || ext === '.xls') {
