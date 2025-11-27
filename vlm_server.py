@@ -11,9 +11,11 @@ from typing import List, Optional
 import torch
 import base64
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFilter
 import logging
 from transformers import AutoProcessor, Qwen2VLForConditionalGeneration
+import pytesseract
+import numpy as np
 
 # Logging ayarla
 logging.basicConfig(level=logging.INFO)
@@ -93,10 +95,10 @@ async def analyze_image(request: VLMRequest) -> VLMResponse:
         image_data = base64.b64decode(request.image_base64)
         image = Image.open(BytesIO(image_data)).convert("RGB")
         
-        # Görev spesifik prompt'lar
+        # Görev spesifik prompt'lar - İçerik TÜRÜNÜ tespit et
         prompts = {
-            "extract": "Bu görselde neler vardır? Tabloları, diyagramları, grafikleri, metinleri detaylı olarak açıkla. Türkçe olarak cevap ver.",
-            "describe": "Bu görseli detaylı olarak açıkla. Ne görmektedir? Türkçe olarak cevap ver.",
+            "extract": "Bu görselde tablo var mı? Diyagram var mı? Grafik var mı? Sadece şu cevaplardan birini ver: 'TABLO', 'DIYAGRAM', 'GRAFIK', 'METIN'. Başka birşey yazma!",
+            "describe": "Bu görseli kısaca açıkla. Ne görmektedir? Türkçe olarak cevap ver.",
             "table": "Bu görselde tablo var mı? Varsa tablo içeriğini Markdown formatında göster. Türkçe olarak cevap ver.",
             "diagram": "Bu görselde diyagram, grafik veya şekil var mı? Varsa ne anlattığını açıkla. Türkçe olarak cevap ver.",
         }
@@ -115,24 +117,39 @@ async def analyze_image(request: VLMRequest) -> VLMResponse:
             # Model inference
             generated_ids = model.generate(
                 **inputs,
-                max_new_tokens=1024,
-                temperature=0.7,
+                max_new_tokens=512,
+                temperature=0.1,  # Deterministik cevap
                 top_p=0.95,
             )
             
             # Sonucu decode et
             analysis = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
         
-        # İçerik türünü belirle
+        # VLM sonucundan içerik türünü çıkar
         analysis_lower = analysis.lower()
-        if "tablo" in analysis_lower or "|" in analysis:
+        
+        # İçerik türünü belirle (VLM hatasına karşı fallback)
+        if "tablo" in analysis_lower:
             content_type = "table"
-        elif "diyagram" in analysis_lower or "grafik" in analysis_lower:
+            # Tabloyu OCR ile çıkar
+            try:
+                ocr_text = pytesseract.image_to_string(image, lang='tur+eng')
+                analysis = f"[TABLO]\n\n{ocr_text}\n\n[VLM Açıklaması]\n{analysis}"
+            except:
+                pass
+        elif "diyagram" in analysis_lower or "şema" in analysis_lower:
             content_type = "diagram"
-        elif "grafik" in analysis_lower or "chart" in analysis_lower:
+        elif "grafik" in analysis_lower or "chart" in analysis_lower or "grafik" in analysis_lower:
             content_type = "chart"
         else:
+            # Fallback: OCR ile metin çıkar
             content_type = "text"
+            try:
+                ocr_text = pytesseract.image_to_string(image, lang='tur+eng')
+                if ocr_text.strip():
+                    analysis = f"{ocr_text}\n\n[VLM Açıklaması]\n{analysis}"
+            except:
+                pass
         
         logger.info(f"✅ Analiz tamamlandı (type={content_type})")
         logger.info(f"   Sonuç: {analysis[:100]}...")
@@ -140,7 +157,7 @@ async def analyze_image(request: VLMRequest) -> VLMResponse:
         return VLMResponse(
             task=request.task,
             analysis=analysis,
-            confidence=0.95,  # VLM için tahmini güven
+            confidence=0.90,
             content_type=content_type
         )
         

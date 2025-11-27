@@ -37,3 +37,33 @@ ERROR:__main__:   Model output hatası: Cannot handle batch sizes > 1 if no padd
 INFO:__main__:✅ Reranking tamamlandı: top 10 seçildi
 INFO:__main__:   En yüksek skor: 9.0000
 INFO:     127.0.0.1:60252 - "POST /rerank HTTP/1.1" 200 OK
+INFO:__main__:🔄 Reranking başladı: sorgu='Tablo 2.4'te bulunan Yönetim ve Destek adlı progra...', dokü=10
+ERROR:__main__:   Model output hatası: Cannot handle batch sizes > 1 if no padding token is defined.
+INFO:__main__:✅ Reranking tamamlandı: top 10 seçildi
+INFO:__main__:   En yüksek skor: 9.0000
+INFO:     127.0.0.1:62240 - "POST /rerank HTTP/1.1" 200 OK
+INFO:__main__:🔄 Reranking başladı: sorgu='personel giderlerinin yıl sonu harcama toplamı ned...', dokü=10
+ERROR:__main__:   Model output hatası: Cannot handle batch sizes > 1 if no padding token is defined.
+INFO:__main__:✅ Reranking tamamlandı: top 10 seçildi
+INFO:__main__:   En yüksek skor: 9.0000
+INFO:     127.0.0.1:62265 - "POST /rerank HTTP/1.1" 200 OK
+INFO:__main__:🔄 Reranking başladı: sorgu='faaliyet sonuçları tablosuna göre giderler hesabı ...', dokü=10
+ERROR:__main__:   Model output hatası: Cannot handle batch sizes > 1 if no padding token is defined.
+INFO:__main__:✅ Reranking tamamlandı: top 10 seçildi
+INFO:__main__:   En yüksek skor: 9.0000
+INFO:     127.0.0.1:62396 - "POST /rerank HTTP/1.1" 200 OK
+INFO:__main__:🔄 Reranking başladı: sorgu='bilançoya göre 2021 yılında dönen varlıklar ne kad...', dokü=10
+ERROR:__main__:   Model output hatası: Cannot handle batch sizes > 1 if no padding token is defined.
+INFO:__main__:✅ Reranking tamamlandı: top 10 seçildi
+INFO:__main__:   En yüksek skor: 9.0000
+INFO:     127.0.0.1:62404 - "POST /rerank HTTP/1.1" 200 OK
+INFO:__main__:🔄 Reranking başladı: sorgu=' faaliyet sonuçları tablosuna göre giderler hesabı...', dokü=10
+ERROR:__main__:   Model output hatası: Cannot handle batch sizes > 1 if no padding token is defined.
+INFO:__main__:✅ Reranking tamamlandı: top 10 seçildi
+INFO:__main__:   En yüksek skor: 9.0000
+INFO:     127.0.0.1:62441 - "POST /rerank HTTP/1.1" 200 OK
+INFO:__main__:🔄 Reranking başladı: sorgu='tablo 5.1'e göre iki bozuk paranın birlikte atılma...', dokü=10
+ERROR:__main__:   Model output hatası: Cannot handle batch sizes > 1 if no padding token is defined.
+INFO:__main__:✅ Reranking tamamlandı: top 10 seçildi
+INFO:__main__:   En yüksek skor: 9.0000
+INFO:     127.0.0.1:62496 - "POST /rerank HTTP/1.1" 200 OK

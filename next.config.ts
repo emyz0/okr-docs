@@ -1,23 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  webpack: (config, { isServer }) => {
-    // pdfjs-dist için fallback ayarı
-    // Node.js ortamında DOM-based kütüphaneleri devre dışı bırak
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      "canvas": false,
-      "encoding": false,
-      "fs": false,
-    };
-
-    // pdfjs-dist'i uygun şekilde yükle
-    config.externals = config.externals || [];
-    if (isServer) {
-      config.externals.push("pdfjs-dist");
-    }
-
-    return config;
+  // Next.js 16: Turbopack kullanıyor (webpack gerekli değil)
+  // Turbopack pdfjs-dist'i default olarak doğru işliyor
+  turbopack: {
+    // Turbopack override gerekli değil - default ayarlar yeterli
   },
 };
 
