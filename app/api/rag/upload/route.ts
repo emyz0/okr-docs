@@ -70,27 +70,34 @@ export async function POST(req: NextRequest) {
           docs = await loader.load()
           console.log(`📑 PDF: ${file.name} - ${docs.length} sayfa`)
           
-          // 🖼️ VLM ile görselleri ve tabloları analiz et
+          // 🖼️ VLM ile görselleri ve tabloları analiz et (OPTIONAL - FAIL SAFE)
           try {
-            const { extractContentWithVLM, formatVLMChunks } = await import('@/lib/rag/pdf-vlm-analyzer')
-            const vlmResults = await extractContentWithVLM(tempPath, 20, file.name) // İlk 20 sayfa
-            
-            if (vlmResults.length > 0) {
-              console.log(`✅ VLM: ${vlmResults.length} sayfadan analiz yapıldı`)
+            // VLM server'ı check et
+            const healthCheck = await fetch('http://localhost:8001/health').catch(() => null)
+            if (!healthCheck) {
+              console.warn('⚠️ VLM server ulaşılamıyor (port 8001) - metin chunks ile devam')
+            } else {
+              const { extractContentWithVLM, formatVLMChunks } = await import('@/lib/rag/pdf-vlm-analyzer')
+              const vlmResults = await extractContentWithVLM(tempPath, 20, file.name) // İlk 20 sayfa
               
-              // VLM sonuçlarını dokümanlara ekle
-              const vlmChunks = await formatVLMChunks(vlmResults, file.name)
-              vlmChunks.forEach((chunk) => {
-                docs.push({
-                  pageContent: chunk.content,
-                  metadata: chunk.metadata
+              if (vlmResults.length > 0) {
+                console.log(`✅ VLM: ${vlmResults.length} sayfadan analiz yapıldı`)
+                
+                // VLM sonuçlarını dokümanlara ekle
+                const vlmChunks = await formatVLMChunks(vlmResults, file.name)
+                vlmChunks.forEach((chunk) => {
+                  docs.push({
+                    pageContent: chunk.content,
+                    metadata: chunk.metadata
+                  })
                 })
-              })
-              
-              console.log(`📊 VLM chunk'ları eklendi: toplam ${docs.length} dokuman`)
+                
+                console.log(`📊 VLM chunks eklendi: toplam ${docs.length} dokuman`)
+              }
             }
           } catch (vlmError) {
-            console.warn(`⚠️ VLM hatası (devam etme): ${vlmError}`)
+            console.warn(`⚠️ VLM hatasi (devam): ${vlmError instanceof Error ? vlmError.message : String(vlmError)}`)
+            console.warn('Sistem metin chunks ile devam ediyor (gorsel analiz atlandi)')
           }
         } 
         else if (ext === '.xlsx' || ext === '.xls') {

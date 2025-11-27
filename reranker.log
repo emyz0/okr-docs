@@ -1,0 +1,39 @@
+/Users/emirhanyilmaz/Desktop/okr-docs/reranker_server.py:37: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Started server process [65950]
+INFO:     Waiting for application startup.
+INFO:__main__:🤖 Qwen3-Reranker-4B model yükleniyor...
+INFO:__main__:📍 Device: cpu
+INFO:__main__:✅ Tokenizer yüklendi (pad_token=<|endoftext|>)
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:16<00:16, 16.90s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:06<00:00, 35.88s/it]Loading checkpoint shards: 100%|██████████| 2/2 [01:06<00:00, 33.06s/it]
+Some weights of Qwen3ForSequenceClassification were not initialized from the model checkpoint at Qwen/Qwen3-Reranker-4B and are newly initialized: ['score.weight']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+INFO:__main__:✅ Model başarıyla yüklendi
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:__main__:🔄 Reranking başladı: sorgu='Veri tabanı nedir?...', dokü=4
+ERROR:__main__:   Model output hatası: Cannot handle batch sizes > 1 if no padding token is defined.
+INFO:__main__:✅ Reranking tamamlandı: top 2 seçildi
+INFO:__main__:   En yüksek skor: 3.0000
+INFO:     127.0.0.1:60085 - "POST /rerank HTTP/1.1" 200 OK
+INFO:__main__:🔄 Reranking başladı: sorgu='Tablo 1 nedir?...', dokü=10
+ERROR:__main__:   Model output hatası: Cannot handle batch sizes > 1 if no padding token is defined.
+INFO:__main__:✅ Reranking tamamlandı: top 10 seçildi
+INFO:__main__:   En yüksek skor: 9.0000
+INFO:     127.0.0.1:60110 - "POST /rerank HTTP/1.1" 200 OK
+INFO:__main__:🔄 Reranking başladı: sorgu='What are the advantages of using 3×3 convolution f...', dokü=10
+ERROR:__main__:   Model output hatası: Cannot handle batch sizes > 1 if no padding token is defined.
+INFO:__main__:✅ Reranking tamamlandı: top 10 seçildi
+INFO:__main__:   En yüksek skor: 9.0000
+INFO:     127.0.0.1:60220 - "POST /rerank HTTP/1.1" 200 OK
+INFO:__main__:🔄 Reranking başladı: sorgu='VGG-16 ve VGG-19 arasındaki temel fark nedir?...', dokü=10
+ERROR:__main__:   Model output hatası: Cannot handle batch sizes > 1 if no padding token is defined.
+INFO:__main__:✅ Reranking tamamlandı: top 10 seçildi
+INFO:__main__:   En yüksek skor: 9.0000
+INFO:     127.0.0.1:60252 - "POST /rerank HTTP/1.1" 200 OK

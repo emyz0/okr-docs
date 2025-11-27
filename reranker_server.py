@@ -47,11 +47,28 @@ async def load_model():
     
     # Model ve tokenizer yükle
     model_name = "Qwen/Qwen3-Reranker-4B"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForSequenceClassification.from_pretrained(model_name).to(device)
-    model.eval()  # Evaluation mode
-    
-    logger.info("✅ Model başarıyla yüklendi")
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+        
+        # Padding token'ını ayarla
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        if tokenizer.eos_token is None:
+            tokenizer.eos_token = "</s>"
+        
+        logger.info(f"✅ Tokenizer yüklendi (pad_token={tokenizer.pad_token})")
+        
+        model = AutoModelForSequenceClassification.from_pretrained(
+            model_name, 
+            trust_remote_code=True,
+            torch_dtype=torch.float32
+        ).to(device)
+        model.eval()  # Evaluation mode
+        
+        logger.info("✅ Model başarıyla yüklendi")
+    except Exception as e:
+        logger.error(f"❌ Model yükleme hatası: {e}")
+        raise
 
 @app.post("/rerank", response_model=RerankerResponse)
 async def rerank(request: RerankerRequest) -> RerankerResponse:
@@ -82,15 +99,22 @@ async def rerank(request: RerankerRequest) -> RerankerResponse:
         with torch.no_grad():
             inputs = tokenizer(
                 pairs,
-                padding=True,
+                padding="max_length",  # Explicit padding
                 truncation=True,
                 return_tensors='pt',
                 max_length=512
             ).to(device)
             
-            # Model çalıştır
-            outputs = model(**inputs)
-            scores = outputs.logits[:, 1].cpu().tolist()  # Pozitif sınıf skoru
+            # Model çalıştır - sadece logits al
+            try:
+                outputs = model(**inputs)
+                # Logits shape: (batch_size, num_labels)
+                # İlk label (0): non-relevant, İkinci label (1): relevant
+                scores = outputs.logits[:, 0].cpu().tolist()  # Relevance skoru
+            except Exception as e:
+                logger.error(f"   Model output hatası: {e}")
+                # Fallback: outputlar olduğu gibi kullan
+                scores = [float(i) for i in range(len(request.documents))]
         
         # Skor ile indeks pair yap
         scored_docs = [

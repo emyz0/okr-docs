@@ -1,0 +1,23 @@
+
+> okr-docs@0.1.0 dev
+> next dev
+
+ ⚠ Port 3000 is in use by process 8981, using available port 3001 instead.
+   ▲ Next.js 16.0.1 (Turbopack)
+   - Local:        http://localhost:3001
+   - Network:      http://192.168.1.10:3001
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1431ms
+🔍 DEBUG: conversationHistory type: object
+🔍 DEBUG: conversationHistory value: []
+📂 DEBUG: sectionId: yok
+🔄 Reranking başladı...
+✅ Qwen reranker başarılı
+⚠️ Conversation history yok (ilk soru)
+🤖 LLM'e gönderiliyor...
+🆕 İlk soru - yeni section oluşturuluyor...
+✨ Yeni section oluşturuldu: 16
+ POST /api/rag/query 200 in 117s (compile: 739ms, render: 116s)
+[?25h

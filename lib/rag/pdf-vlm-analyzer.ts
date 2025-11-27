@@ -9,8 +9,20 @@ import path from "path";
 import * as pdfjsLib from "pdfjs-dist";
 import { createCanvas } from "canvas";
 
+// Node.js ortamında DOMMatrix tanımla (pdfjs için gerekli)
+if (typeof globalThis !== "undefined" && !("DOMMatrix" in globalThis)) {
+  (globalThis as any).DOMMatrix = class DOMMatrix {
+    constructor(public values: number[]) {}
+  };
+}
+
 // PDFDocument'i ayarla
 const PDFDocument = (pdfjsLib as any).getDocument;
+
+// Worker dosyasını Node.js'e hazırla
+if (typeof globalThis !== "undefined" && "pdfjsWorker" in pdfjsLib) {
+  (pdfjsLib as any).GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${(pdfjsLib as any).version}/pdf.worker.min.js`;
+}
 
 /**
  * PDF sayfasını Base64 görsele dönüştür
