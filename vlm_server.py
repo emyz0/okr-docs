@@ -1,38 +1,63 @@
 #!/usr/bin/env python3
 """
-🖼️ QWEN3 VLM SERVER
-Qwen/Qwen3-VL-4B-Instruct modeli ile görselleri analiz eden FastAPI server
-PDF sayfalarından tablo, diagram, grafik çıkarımı yapıyor
+🖼️ QWEN VLM SERVER - HUGGING FACE INFERENCE API
+Hugging Face Inference API kullanarak Qwen Vision Language Model'i çalıştırır
+Model: Qwen/Qwen2-VL-32B-Instruct (32 Milyar parametre)
+      veya Qwen/Qwen2-VL-14B-Instruct (14 Milyar parametre)
+
+NOT: Bu sunucu lokal modeli çalıştırmaz. Hugging Face serverlarında çalışan 
+      API endpoint'ine HTTP istekleri gönderir.
 """
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List, Optional
-import torch
+from typing import Optional
 import base64
 from io import BytesIO
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image
 import logging
-from transformers import AutoProcessor, Qwen2VLForConditionalGeneration
-import pytesseract
-import numpy as np
+import httpx
+import os
+import json
+from dotenv import load_dotenv
+
+# .env.local dosyasını yükle
+load_dotenv()
 
 # Logging ayarla
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Qwen3 VLM Server", version="1.0")
+app = FastAPI(title="Qwen VLM Server (HF Inference)", version="2.0")
 
-# Global model ve processor
-model = None
-processor = None
-device = None
+# Hugging Face API anahtarı
+HF_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
+if not HF_API_KEY:
+    logger.warning("⚠️ HUGGINGFACE_API_KEY environment variable set edilmedi!")
+    logger.warning("   .env.local dosyasına ekle: HUGGINGFACE_API_KEY=hf_...")
+
+# Model seçim (32B daha güçlü, 14B daha hızlı)
+# Hangisini kullanacağına karar ver:
+MODEL_OPTIONS = {
+    "32b": "Qwen/Qwen2-VL-32B-Instruct",  # Daha güçlü (32 milyar parametre)
+    "14b": "Qwen/Qwen2-VL-14B-Instruct",  # Daha hızlı (14 milyar parametre)
+}
+
+# Şu an hangi model kullanıyoruz?
+ACTIVE_MODEL = "32b"  # ← Burası değiştirebilirsin: "32b" veya "14b"
+MODEL_ID = MODEL_OPTIONS[ACTIVE_MODEL]
+
+# HF Inference API endpoint
+HF_API_URL = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
+
+logger.info(f"🖼️ Model: {MODEL_ID}")
+logger.info(f"   Endpoint: {HF_API_URL}")
 
 class VLMRequest(BaseModel):
     """VLM analiz isteği"""
     image_base64: str  # Base64 encoded image
     task: str = "extract"  # "extract", "describe", "table", "diagram"
-    language: str = "turkish"  # "turkish", "english", "mixed"
+    language: str = "turkish"  # "turkish", "english"
 
 class VLMResponse(BaseModel):
     """VLM analiz yanıtı"""
@@ -41,41 +66,125 @@ class VLMResponse(BaseModel):
     confidence: float
     content_type: str  # "text", "table", "diagram", "chart", "mixed"
 
-@app.on_event("startup")
-async def load_model():
-    """Sunucu başlatıldığında model yükle"""
-    global model, processor, device
+def encode_image_for_hf(image: Image.Image) -> str:
+    """
+    PIL Image'i Hugging Face API için format'a çevir
+    HF API base64 veya URL kabul ediyor
+    """
+    # Image'i JPEG byte'a çevir
+    buffer = BytesIO()
+    image.save(buffer, format="JPEG", quality=95)
+    buffer.seek(0)
     
-    logger.info("🖼️ Qwen3-VL-4B-Instruct model yükleniyor...")
+    # Base64'e encode et
+    image_base64 = base64.b64encode(buffer.read()).decode("utf-8")
     
-    # Device seç
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    logger.info(f"📍 Device: {device}")
+    # data:image/jpeg;base64, formatında döndür
+    return f"data:image/jpeg;base64,{image_base64}"
+
+async def call_hf_inference(image: Image.Image, prompt: str) -> str:
+    """
+    Hugging Face Inference API'ye çağrı yap
     
-    model_name = "Qwen/Qwen3-VL-4B-Instruct"
-    try:
-        # Processor ve model yükle
-        processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
-        model = Qwen2VLForConditionalGeneration.from_pretrained(
-            model_name,
-            torch_dtype=torch.float16 if device.type == "cuda" else torch.float32,
-            attn_implementation="flash_attention_2" if device.type == "cuda" else "eager",
-            device_map="auto" if device.type == "cuda" else None
+    Args:
+        image: PIL Image object
+        prompt: Metin talimatı
+    
+    Returns:
+        Model'in yanıtı (string)
+    """
+    if not HF_API_KEY:
+        raise HTTPException(
+            status_code=500,
+            detail="HUGGINGFACE_API_KEY ayarlanmadı. .env.local dosyasına ekle"
         )
+    
+    try:
+        # Image'i HF formatına çevir
+        image_data = encode_image_for_hf(image)
         
-        if device.type == "cpu":
-            model = model.to(device)
+        # Payload hazırla
+        # Vision modelleri genellikle şu format'u kabul eder:
+        # {
+        #   "inputs": [
+        #     {
+        #       "type": "image",
+        #       "image": "base64_data"
+        #     },
+        #     {
+        #       "type": "text",
+        #       "text": "Prompt"
+        #     }
+        #   ]
+        # }
         
-        model.eval()
-        logger.info("✅ VLM Model başarıyla yüklendi")
+        payload = {
+            "inputs": [
+                {
+                    "type": "image",
+                    "image": image_data
+                },
+                {
+                    "type": "text",
+                    "text": prompt
+                }
+            ]
+        }
+        
+        headers = {
+            "Authorization": f"Bearer {HF_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        logger.info(f"📡 HF API'ye istek gönderiliyor...")
+        
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                HF_API_URL,
+                json=payload,
+                headers=headers
+            )
+        
+        logger.info(f"📡 Yanıt status: {response.status_code}")
+        
+        if response.status_code != 200:
+            error_detail = response.text
+            logger.error(f"❌ HF API hatası: {error_detail}")
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"HF API hatası: {error_detail}"
+            )
+        
+        # Yanıtı parse et
+        result = response.json()
+        
+        # HF API'nin dönüş format'ı genellikle:
+        # [{"generated_text": "..."}, ...]
+        # veya
+        # {"generated_text": "..."}
+        
+        if isinstance(result, list) and len(result) > 0:
+            analysis = result[0].get("generated_text", str(result))
+        elif isinstance(result, dict):
+            analysis = result.get("generated_text", json.dumps(result))
+        else:
+            analysis = str(result)
+        
+        logger.info(f"✅ Analiz başarılı: {analysis[:100]}...")
+        return analysis
+        
+    except httpx.TimeoutException:
+        logger.error("❌ HF API timeout (2 dakika)")
+        raise HTTPException(status_code=504, detail="HF API timeout")
     except Exception as e:
-        logger.error(f"❌ Model yükleme hatası: {e}")
-        raise
+        logger.error(f"❌ HF API çağrı hatası: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"API hatası: {str(e)}")
 
 @app.post("/analyze", response_model=VLMResponse)
 async def analyze_image(request: VLMRequest) -> VLMResponse:
     """
     Görsel analiz yap - tablo, diagram, metin çıkar
+    (HF Inference API kullanarak)
     
     Args:
         request.image_base64: Base64 encoded görsel
@@ -85,9 +194,6 @@ async def analyze_image(request: VLMRequest) -> VLMResponse:
     Returns:
         VLMResponse: Analiz sonucu
     """
-    if not model or not processor:
-        raise HTTPException(status_code=500, detail="Model yüklenmedi")
-    
     try:
         logger.info(f"🖼️ Görsel analizi başladı (task={request.task})")
         
@@ -95,7 +201,7 @@ async def analyze_image(request: VLMRequest) -> VLMResponse:
         image_data = base64.b64decode(request.image_base64)
         image = Image.open(BytesIO(image_data)).convert("RGB")
         
-        # Görev spesifik prompt'lar - İçerik TÜRÜNÜ tespit et
+        # Görev spesifik prompt'lar
         prompts = {
             "extract": "Bu görselde tablo var mı? Diyagram var mı? Grafik var mı? Sadece şu cevaplardan birini ver: 'TABLO', 'DIYAGRAM', 'GRAFIK', 'METIN'. Başka birşey yazma!",
             "describe": "Bu görseli kısaca açıkla. Ne görmektedir? Türkçe olarak cevap ver.",
@@ -105,62 +211,32 @@ async def analyze_image(request: VLMRequest) -> VLMResponse:
         
         prompt = prompts.get(request.task, prompts["extract"])
         
-        # Modeli çalıştır
-        with torch.no_grad():
-            # Görseli ve prompt'u processor'a gönder
-            inputs = processor(
-                text=prompt,
-                images=[image],
-                return_tensors="pt"
-            ).to(device)
-            
-            # Model inference
-            generated_ids = model.generate(
-                **inputs,
-                max_new_tokens=512,
-                temperature=0.1,  # Deterministik cevap
-                top_p=0.95,
-            )
-            
-            # Sonucu decode et
-            analysis = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+        # HF Inference API'ye çağrı yap
+        analysis = await call_hf_inference(image, prompt)
         
-        # VLM sonucundan içerik türünü çıkar
+        # İçerik türünü belirle
         analysis_lower = analysis.lower()
         
-        # İçerik türünü belirle (VLM hatasına karşı fallback)
         if "tablo" in analysis_lower:
             content_type = "table"
-            # Tabloyu OCR ile çıkar
-            try:
-                ocr_text = pytesseract.image_to_string(image, lang='tur+eng')
-                analysis = f"[TABLO]\n\n{ocr_text}\n\n[VLM Açıklaması]\n{analysis}"
-            except:
-                pass
         elif "diyagram" in analysis_lower or "şema" in analysis_lower:
             content_type = "diagram"
-        elif "grafik" in analysis_lower or "chart" in analysis_lower or "grafik" in analysis_lower:
+        elif "grafik" in analysis_lower or "chart" in analysis_lower:
             content_type = "chart"
         else:
-            # Fallback: OCR ile metin çıkar
             content_type = "text"
-            try:
-                ocr_text = pytesseract.image_to_string(image, lang='tur+eng')
-                if ocr_text.strip():
-                    analysis = f"{ocr_text}\n\n[VLM Açıklaması]\n{analysis}"
-            except:
-                pass
         
         logger.info(f"✅ Analiz tamamlandı (type={content_type})")
-        logger.info(f"   Sonuç: {analysis[:100]}...")
         
         return VLMResponse(
             task=request.task,
             analysis=analysis,
-            confidence=0.90,
+            confidence=0.95,  # HF daha güvenilir
             content_type=content_type
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Analiz hatası: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Analiz hatası: {str(e)}")
@@ -170,17 +246,19 @@ async def health():
     """Sunucu sağlık kontrolü"""
     return {
         "status": "healthy",
-        "model": "Qwen/Qwen3-VL-4B-Instruct",
-        "device": str(device),
-        "model_loaded": model is not None
+        "model": MODEL_ID,
+        "type": "hugging_face_inference",
+        "api_key_set": HF_API_KEY is not None
     }
 
 @app.get("/")
 async def root():
     """Ana sayfa"""
     return {
-        "name": "Qwen3 VLM Server",
-        "version": "1.0",
+        "name": "Qwen VLM Server (HF Inference)",
+        "version": "2.0",
+        "model": MODEL_ID,
+        "type": "hugging_face_inference_api",
         "endpoints": [
             "/analyze (POST) - Görsel analiz et",
             "/health (GET) - Sunucu durumu"

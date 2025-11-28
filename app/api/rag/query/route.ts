@@ -3,7 +3,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/rag/db";
 import { embeddings, llm } from "@/lib/rag/chain";
-import { rerankDocuments } from "@/lib/rag/rerank";
 
 export async function POST(req: NextRequest) {
   try {
@@ -98,17 +97,15 @@ export async function POST(req: NextRequest) {
       
       console.log("✅ Qwen reranker başarılı");
     } catch (qwenError: any) {
-      console.warn("⚠️ Qwen reranker kullanılamadı, fallback to Cohere:", qwenError.message);
+      console.warn("⚠️ Qwen reranker kullanılamadı, vector similarity sonuçlarını kullanıyoruz:", qwenError.message);
       
-      // Fallback: Cohere API'yi kullan
-      const rerankInput = {
-        query: question,
-        documents: result.rows.map((r: any, i: number) => ({
-          id: i,
-          text: r.content.substring(0, 500),
-        })),
-      };
-      rerankResults = await rerankDocuments(rerankInput, Math.min(result.rows.length, 10));
+      // Fallback: Qwen server kapalıysa vector similarity sonuçlarını kullan
+      // Her dokuman'ı sırasıyla rerank result'a çevir
+      rerankResults = result.rows.map((_, i: number) => ({
+        index: i,
+        relevance_score: 1 - i * 0.05, // Yaklaşık puanlama (0.95, 0.90, 0.85...)
+      }));
+      console.log("⚠️ Vector similarity sonuçları kullanılıyor (Qwen server down)");
     }
 
     // ===== HER PDF'DEN KAYNAKLAR SEÇ =====

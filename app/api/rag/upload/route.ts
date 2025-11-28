@@ -6,7 +6,6 @@ import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf'
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters'
 import { OpenAIEmbeddings } from "@langchain/openai"
 import { pool } from '@/lib/rag/db'
-import { recognizeImageText } from '@/lib/rag/pdf-ocr-processor'
 import fs from 'fs'
 import path from 'path'
 import { extractTextFromExcel, extractTextFromWord, extractTextFromTxt } from '@/lib/rag/document-parser'

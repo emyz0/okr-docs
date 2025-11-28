@@ -5,22 +5,21 @@
         [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
         
   @app.on_event("startup")
-INFO:     Started server process [53991]
+INFO:     Started server process [59163]
 INFO:     Waiting for application startup.
 INFO:__main__:🤖 Qwen3-Reranker-4B model yükleniyor...
 INFO:__main__:📍 Device: cpu
 INFO:__main__:✅ Tokenizer yüklendi (pad_token=<|endoftext|>)
 `torch_dtype` is deprecated! Use `dtype` instead!
-Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:14<00:14, 14.31s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:49<00:00, 26.57s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:49<00:00, 24.73s/it]
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:16<00:16, 16.68s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:37<00:00, 19.19s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:37<00:00, 18.83s/it]
 Some weights of Qwen3ForSequenceClassification were not initialized from the model checkpoint at Qwen/Qwen3-Reranker-4B and are newly initialized: ['score.weight']
 You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
 INFO:__main__:✅ Model başarıyla yüklendi
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:49387 - "GET /health HTTP/1.1" 200 OK
 INFO:__main__:🔄 Reranking başladı: sorgu='Türkiye'nin başkenti neresi?...', dokü=2
-ERROR:__main__:   Model output hatası: Cannot handle batch sizes > 1 if no padding token is defined.
-INFO:__main__:✅ Reranking tamamlandı: top 2 seçildi
-INFO:__main__:   En yüksek skor: 1.0000
-INFO:     127.0.0.1:49212 - "POST /rerank HTTP/1.1" 200 OK
-/opt/homebrew/Cellar/python@3.14/3.14.0_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/multiprocessing/resource_tracker.py:297: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/mp-6ame1m5c'}
+INFO:__main__:   ✅ Tokenize başarılı: input shape=torch.Size([2, 256])
+INFO:__main__:   🚀 Model inference başladı...
+/opt/homebrew/Cellar/python@3.14/3.14.0_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/multiprocessing/resource_tracker.py:297: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/mp-c_493b78'}
   warnings.warn(
