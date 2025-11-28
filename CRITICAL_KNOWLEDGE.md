@@ -1,5 +1,14 @@
 # 🎯 KRİTİK BİLGİ - RAG Sistemi Tam Anlatım
 
+## 🔁 Güncellemeler (28 Kasım 2025)
+
+- VLM server güncellendi: HuggingFace Router endpoint ve OpenAI-compatible client kullanılıyor. `vlm_server.py` artık `OpenAI(base_url="https://router.huggingface.co/v1", api_key=HF_API_KEY)` ile HF router'a çağrı yapıyor ve model olarak `Qwen/Qwen2-VL-32B-Instruct` hedefleniyor.
+- Reranker değişiklikleri: Eskiden Cohere fallback'ı vardı ve `lib/rag/rerank.ts` kullanılıyordu — bu dosya kaldırıldı. Ana fallback artık pozisyona dayalı vector-similarity skoru: `score = 1 - index * 0.05`. (`app/api/rag/query/route.ts` içinde implement edildi.)
+- Database schema uygulandı: `lib/rag/schema.sql` veritabanına yüklendi ve `documents` tablosu oluşturuldu (embedding sütunu ile). Artık PDF upload sonrası chunk'lar veritabanına kaydediliyor.
+- Context excerpt uzunluğu arttırıldı: `query/route.ts`'de LLM'e gönderilen excerpt 600 → 2000 karakter yapıldı; tabloların daha fazla içeriği görünür.
+
+Bu dosyada ve cheatsheet'lerde aşağıdaki bölümlerde bu değişikliklerin kısa notları yer alır.
+
 ## Başlangıç: Problemi Anlama
 
 ### ❓ Problem Nedir?

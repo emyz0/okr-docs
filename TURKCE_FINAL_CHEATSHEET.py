@@ -14,6 +14,16 @@ print("""
 📌 ÖN KÖŞESİ: BİLMEN GEREKEN 5 ŞEY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+📢 GÜNCELLEMELER (28 Kasım 2025)
+
+- VLM: `vlm_server.py` güncellendi — HuggingFace Router (OpenAI-compatible) kullanılarak
+   `Qwen/Qwen2-VL-32B-Instruct` modeline istek atılıyor (`router.huggingface.co/v1`).
+- Reranker: Eski Cohere fallback'ı kaldırıldı. `lib/rag/rerank.ts` silindi.
+   Fallback artık `app/api/rag/query/route.ts` içinde pozisyona dayalı (1 - index*0.05).
+- DB: `lib/rag/schema.sql` çalıştırıldı; `documents` tablosu oluşturuldu ve chunk'lar DB'ye kay
+   dediliyor.
+- Prompt context excerpt uzunluğu `600` → `2000` karaktere çıkarıldı (tablolar daha görünür).
+
 1️⃣ PROBLEM:
    Şirket PDF'lerini LLM bilmiyor → Halüsinasyon yapıyor
    Çözüm: RAG sistemi PDF'leri getiriyor → LLM doğru cevap veriyor

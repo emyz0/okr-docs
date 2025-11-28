@@ -5,22 +5,56 @@
         [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
         
   @app.on_event("startup")
-INFO:     Started server process [53991]
+INFO:     Started server process [33346]
 INFO:     Waiting for application startup.
 INFO:__main__:🤖 Qwen3-Reranker-4B model yükleniyor...
 INFO:__main__:📍 Device: cpu
-INFO:__main__:✅ Tokenizer yüklendi (pad_token=<|endoftext|>)
+INFO:__main__:✅ Tokenizer yüklendi (pad_token=<|endoftext|>, pad_token_id=151643)
 `torch_dtype` is deprecated! Use `dtype` instead!
-Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:14<00:14, 14.31s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:49<00:00, 26.57s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:49<00:00, 24.73s/it]
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:08<00:08,  8.97s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:24<00:00, 12.87s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:24<00:00, 12.29s/it]
 Some weights of Qwen3ForSequenceClassification were not initialized from the model checkpoint at Qwen/Qwen3-Reranker-4B and are newly initialized: ['score.weight']
 You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
 INFO:__main__:✅ Model başarıyla yüklendi
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-INFO:__main__:🔄 Reranking başladı: sorgu='Türkiye'nin başkenti neresi?...', dokü=2
-ERROR:__main__:   Model output hatası: Cannot handle batch sizes > 1 if no padding token is defined.
-INFO:__main__:✅ Reranking tamamlandı: top 2 seçildi
-INFO:__main__:   En yüksek skor: 1.0000
-INFO:     127.0.0.1:49212 - "POST /rerank HTTP/1.1" 200 OK
-/opt/homebrew/Cellar/python@3.14/3.14.0_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/multiprocessing/resource_tracker.py:297: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/mp-6ame1m5c'}
-  warnings.warn(
+INFO:     127.0.0.1:50716 - "GET /health HTTP/1.1" 200 OK
+INFO:__main__:🔄 Reranking başladı: sorgu='Tablo 1'e göre 1921 İstanbul İşletme Sayıları nedi...', dokü=10
+INFO:__main__:   ✅ Tokenize başarılı: input shape=torch.Size([10, 256])
+INFO:__main__:   🚀 Model inference başladı...
+INFO:__main__:   ✅ Model inference başarılı, logits shape=torch.Size([10, 2])
+INFO:__main__:   📊 Logits sample: [-2.3012776374816895, -1.7604845762252808]
+INFO:__main__:   📊 Probs sample: [0.36800312995910645, 0.6319968700408936]
+INFO:__main__:   ✅ Scores hesaplandı: [0.6319968700408936, 0.03385557606816292, 0.005979224573820829]...
+INFO:__main__:✅ Reranking tamamlandı: top 10 seçildi
+INFO:__main__:   En yüksek skor: 0.6320
+INFO:     127.0.0.1:51633 - "POST /rerank HTTP/1.1" 200 OK
+INFO:__main__:🔄 Reranking başladı: sorgu='Tablo 4'te verilen Vitaminlerin Kaynakları ve Bazı...', dokü=10
+INFO:__main__:   ✅ Tokenize başarılı: input shape=torch.Size([10, 256])
+INFO:__main__:   🚀 Model inference başladı...
+INFO:__main__:   ✅ Model inference başarılı, logits shape=torch.Size([10, 2])
+INFO:__main__:   📊 Logits sample: [-2.89345121383667, -4.716592311859131]
+INFO:__main__:   📊 Probs sample: [0.8609426021575928, 0.13905739784240723]
+INFO:__main__:   ✅ Scores hesaplandı: [0.13905739784240723, 0.004347848705947399, 0.2920599579811096]...
+INFO:__main__:✅ Reranking tamamlandı: top 10 seçildi
+INFO:__main__:   En yüksek skor: 0.5504
+INFO:     127.0.0.1:51647 - "POST /rerank HTTP/1.1" 200 OK
+INFO:__main__:🔄 Reranking başladı: sorgu='karbonhidratlar hangi atomlardan meydana gelmiştir...', dokü=10
+INFO:__main__:   ✅ Tokenize başarılı: input shape=torch.Size([10, 256])
+INFO:__main__:   🚀 Model inference başladı...
+INFO:__main__:   ✅ Model inference başarılı, logits shape=torch.Size([10, 2])
+INFO:__main__:   📊 Logits sample: [2.192643880844116, -2.8041560649871826]
+INFO:__main__:   📊 Probs sample: [0.9932858347892761, 0.006714158691465855]
+INFO:__main__:   ✅ Scores hesaplandı: [0.006714158691465855, 0.0003209215064998716, 0.056221216917037964]...
+INFO:__main__:✅ Reranking tamamlandı: top 10 seçildi
+INFO:__main__:   En yüksek skor: 0.8267
+INFO:     127.0.0.1:51773 - "POST /rerank HTTP/1.1" 200 OK
+INFO:__main__:🔄 Reranking başladı: sorgu='Tablo 4'te verilen Vitaminlerin Kaynakları ve Bazı...', dokü=10
+INFO:__main__:   ✅ Tokenize başarılı: input shape=torch.Size([10, 256])
+INFO:__main__:   🚀 Model inference başladı...
+INFO:__main__:   ✅ Model inference başarılı, logits shape=torch.Size([10, 2])
+INFO:__main__:   📊 Logits sample: [-2.89345121383667, -4.716592311859131]
+INFO:__main__:   📊 Probs sample: [0.8609426021575928, 0.13905739784240723]
+INFO:__main__:   ✅ Scores hesaplandı: [0.13905739784240723, 0.004347848705947399, 0.2920599579811096]...
+INFO:__main__:✅ Reranking tamamlandı: top 10 seçildi
+INFO:__main__:   En yüksek skor: 0.5504
+INFO:     127.0.0.1:52084 - "POST /rerank HTTP/1.1" 200 OK

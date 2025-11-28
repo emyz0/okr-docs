@@ -151,8 +151,8 @@ export async function POST(req: NextRequest) {
       const chunk = r.chunk_num || metadata.chunk || metadata.part || null
       const page = metadata.page || 'N/A'
       const lineNumber = metadata.lineNumber || 'N/A'
-      // LLM'e gösterilmek üzere metni 600 karakterle sınırla
-      const excerpt = (r.content || '').slice(0, 600)
+      // LLM'e gösterilmek üzere metni 2000 karakterle sınırla (tablolar tam görünsün)
+      const excerpt = (r.content || '').slice(0, 2000)
       return { id: r.id, file_id: r.file_id, source, chunk, page, lineNumber, excerpt, full: r.content, metadata }
     })
 

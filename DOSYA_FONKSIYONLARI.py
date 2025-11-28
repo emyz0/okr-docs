@@ -55,6 +55,15 @@ print("""
 │   ⚠️  Port 8000 açık olması gerekli                                        │
 │   ⚠️  Down olursa query/route.ts fallback kullanıyor                       │
 │                                                                               │
+│ SON GÜNCELLEMELER (28 Kasım 2025):                                           │
+│   - `lib/rag/rerank.ts` dosyası kaldırıldı (Cohere integration removed).     │
+│   - Fallback artık `app/api/rag/query/route.ts` içinde position-based olarak  │
+│     uygulanıyor: `score = 1 - index * 0.05` (vector similarity fallback).     │
+│   - `documents` SQL schema `lib/rag/schema.sql` uygulanarak veritabanı oluştur│
+│    uldu; chunk'lar artık documents tablosuna kaydediliyor.                  │
+│   - `query/route.ts`'de excerpt uzunluğu 600 -> 2000 karaktere çıkarıldı,    │
+│     böylece tabloların daha fazla içeriği LLM'e context olarak gönderiliyor. │
+│                                                                               │
 └───────────────────────────────────────────────────────────────────────────────┘
 
 ┌─ 2️⃣  vlm_server.py ────────────────────────────────────────────────────────┐

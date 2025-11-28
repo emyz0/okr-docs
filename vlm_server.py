@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """
-🖼️ QWEN VLM SERVER - HUGGING FACE INFERENCE API
-Hugging Face Inference API kullanarak Qwen Vision Language Model'i çalıştırır
+🖼️ QWEN VLM SERVER - HUGGING FACE INFERENCE API (OpenAI Compatible)
+Hugging Face router.huggingface.co API'si ile Qwen Vision Language Model'i çalıştırır
 Model: Qwen/Qwen2-VL-32B-Instruct (32 Milyar parametre)
-      veya Qwen/Qwen2-VL-14B-Instruct (14 Milyar parametre)
 
-NOT: Bu sunucu lokal modeli çalıştırmaz. Hugging Face serverlarında çalışan 
-      API endpoint'ine HTTP istekleri gönderir.
+OpenAI client'i kullanıyor (HF router'ı OpenAI-compatible endpoint sunuyor)
 """
 
 from fastapi import FastAPI, HTTPException
@@ -16,10 +14,10 @@ import base64
 from io import BytesIO
 from PIL import Image
 import logging
-import httpx
 import os
 import json
 from dotenv import load_dotenv
+from openai import OpenAI
 
 # .env.local dosyasını yükle
 load_dotenv()
@@ -36,22 +34,17 @@ if not HF_API_KEY:
     logger.warning("⚠️ HUGGINGFACE_API_KEY environment variable set edilmedi!")
     logger.warning("   .env.local dosyasına ekle: HUGGINGFACE_API_KEY=hf_...")
 
-# Model seçim (32B daha güçlü, 14B daha hızlı)
-# Hangisini kullanacağına karar ver:
-MODEL_OPTIONS = {
-    "32b": "Qwen/Qwen2-VL-32B-Instruct",  # Daha güçlü (32 milyar parametre)
-    "14b": "Qwen/Qwen2-VL-14B-Instruct",  # Daha hızlı (14 milyar parametre)
-}
+# Model seçim
+MODEL_ID = "Qwen/Qwen2-VL-32B-Instruct"  # 32B Vision Language Model
 
-# Şu an hangi model kullanıyoruz?
-ACTIVE_MODEL = "32b"  # ← Burası değiştirebilirsin: "32b" veya "14b"
-MODEL_ID = MODEL_OPTIONS[ACTIVE_MODEL]
-
-# HF Inference API endpoint
-HF_API_URL = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
+# OpenAI-compatible client (HF router endpoint'ine)
+client = OpenAI(
+    base_url="https://router.huggingface.co/v1",
+    api_key=HF_API_KEY,
+)
 
 logger.info(f"🖼️ Model: {MODEL_ID}")
-logger.info(f"   Endpoint: {HF_API_URL}")
+logger.info(f"   Provider: HuggingFace Router (OpenAI-compatible)")
 
 class VLMRequest(BaseModel):
     """VLM analiz isteği"""
@@ -66,25 +59,9 @@ class VLMResponse(BaseModel):
     confidence: float
     content_type: str  # "text", "table", "diagram", "chart", "mixed"
 
-def encode_image_for_hf(image: Image.Image) -> str:
-    """
-    PIL Image'i Hugging Face API için format'a çevir
-    HF API base64 veya URL kabul ediyor
-    """
-    # Image'i JPEG byte'a çevir
-    buffer = BytesIO()
-    image.save(buffer, format="JPEG", quality=95)
-    buffer.seek(0)
-    
-    # Base64'e encode et
-    image_base64 = base64.b64encode(buffer.read()).decode("utf-8")
-    
-    # data:image/jpeg;base64, formatında döndür
-    return f"data:image/jpeg;base64,{image_base64}"
-
 async def call_hf_inference(image: Image.Image, prompt: str) -> str:
     """
-    Hugging Face Inference API'ye çağrı yap
+    Hugging Face Router API'ye çağrı yap (OpenAI-compatible)
     
     Args:
         image: PIL Image object
@@ -100,84 +77,45 @@ async def call_hf_inference(image: Image.Image, prompt: str) -> str:
         )
     
     try:
-        # Image'i HF formatına çevir
-        image_data = encode_image_for_hf(image)
+        # Image'i base64'e encode et
+        buffer = BytesIO()
+        image.save(buffer, format="JPEG", quality=95)
+        buffer.seek(0)
+        image_base64 = base64.b64encode(buffer.read()).decode("utf-8")
         
-        # Payload hazırla
-        # Vision modelleri genellikle şu format'u kabul eder:
-        # {
-        #   "inputs": [
-        #     {
-        #       "type": "image",
-        #       "image": "base64_data"
-        #     },
-        #     {
-        #       "type": "text",
-        #       "text": "Prompt"
-        #     }
-        #   ]
-        # }
+        logger.info(f"📡 HF Router'a istek gönderiliyor...")
         
-        payload = {
-            "inputs": [
+        # OpenAI client kullanarak VLM çağrısı yap
+        completion = client.chat.completions.create(
+            model=MODEL_ID,
+            messages=[
                 {
-                    "type": "image",
-                    "image": image_data
-                },
-                {
-                    "type": "text",
-                    "text": prompt
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": prompt
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image_base64}"
+                            }
+                        }
+                    ]
                 }
-            ]
-        }
+            ],
+            max_tokens=512,
+            temperature=0.2,
+        )
         
-        headers = {
-            "Authorization": f"Bearer {HF_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        
-        logger.info(f"📡 HF API'ye istek gönderiliyor...")
-        
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(
-                HF_API_URL,
-                json=payload,
-                headers=headers
-            )
-        
-        logger.info(f"📡 Yanıt status: {response.status_code}")
-        
-        if response.status_code != 200:
-            error_detail = response.text
-            logger.error(f"❌ HF API hatası: {error_detail}")
-            raise HTTPException(
-                status_code=response.status_code,
-                detail=f"HF API hatası: {error_detail}"
-            )
-        
-        # Yanıtı parse et
-        result = response.json()
-        
-        # HF API'nin dönüş format'ı genellikle:
-        # [{"generated_text": "..."}, ...]
-        # veya
-        # {"generated_text": "..."}
-        
-        if isinstance(result, list) and len(result) > 0:
-            analysis = result[0].get("generated_text", str(result))
-        elif isinstance(result, dict):
-            analysis = result.get("generated_text", json.dumps(result))
-        else:
-            analysis = str(result)
+        analysis = completion.choices[0].message.content
         
         logger.info(f"✅ Analiz başarılı: {analysis[:100]}...")
         return analysis
         
-    except httpx.TimeoutException:
-        logger.error("❌ HF API timeout (2 dakika)")
-        raise HTTPException(status_code=504, detail="HF API timeout")
     except Exception as e:
-        logger.error(f"❌ HF API çağrı hatası: {str(e)}")
+        logger.error(f"❌ HF Router API çağrı hatası: {str(e)}")
         raise HTTPException(status_code=500, detail=f"API hatası: {str(e)}")
 
 @app.post("/analyze", response_model=VLMResponse)

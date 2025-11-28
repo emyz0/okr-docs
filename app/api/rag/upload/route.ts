@@ -69,34 +69,41 @@ export async function POST(req: NextRequest) {
           docs = await loader.load()
           console.log(`📑 PDF: ${file.name} - ${docs.length} sayfa`)
           
-          // 🖼️ VLM ile görselleri ve tabloları analiz et (OPTIONAL - FAIL SAFE)
+          // 🖼️ VLM ile görselleri ve tabloları analiz et (ZORUNLU - hem tablo hem grafik)
+          console.log(`🔍 VLM analizi başlanıyor...`)
           try {
             // VLM server'ı check et
-            const healthCheck = await fetch('http://localhost:8001/health').catch(() => null)
+            const healthCheck = await fetch('http://localhost:8001/health')
+              .then(r => r.ok ? true : false)
+              .catch(() => false)
+            
             if (!healthCheck) {
-              console.warn('⚠️ VLM server ulaşılamıyor (port 8001) - metin chunks ile devam')
+              throw new Error('VLM server 8001 portunda erişilemez')
+            }
+            
+            console.log(`✅ VLM server sağlıklı, analiz ediliyor...`)
+            const { extractContentWithVLM, formatVLMChunks } = await import('@/lib/rag/pdf-vlm-analyzer')
+            const vlmResults = await extractContentWithVLM(tempPath, 20, file.name) // İlk 20 sayfa
+            
+            if (vlmResults.length === 0) {
+              console.warn(`⚠️ VLM: Analiz sonucu boş döndü`)
             } else {
-              const { extractContentWithVLM, formatVLMChunks } = await import('@/lib/rag/pdf-vlm-analyzer')
-              const vlmResults = await extractContentWithVLM(tempPath, 20, file.name) // İlk 20 sayfa
+              console.log(`✅ VLM: ${vlmResults.length} sayfadan analiz yapıldı`)
               
-              if (vlmResults.length > 0) {
-                console.log(`✅ VLM: ${vlmResults.length} sayfadan analiz yapıldı`)
-                
-                // VLM sonuçlarını dokümanlara ekle
-                const vlmChunks = await formatVLMChunks(vlmResults, file.name)
-                vlmChunks.forEach((chunk) => {
-                  docs.push({
-                    pageContent: chunk.content,
-                    metadata: chunk.metadata
-                  })
+              // VLM sonuçlarını dokümanlara ekle
+              const vlmChunks = await formatVLMChunks(vlmResults, file.name)
+              vlmChunks.forEach((chunk) => {
+                docs.push({
+                  pageContent: chunk.content,
+                  metadata: chunk.metadata
                 })
-                
-                console.log(`📊 VLM chunks eklendi: toplam ${docs.length} dokuman`)
-              }
+              })
+              
+              console.log(`✅ VLM chunks eklendi: toplam ${docs.length} dokuman (${docs.length - 20} extra from VLM)`)
             }
           } catch (vlmError) {
-            console.warn(`⚠️ VLM hatasi (devam): ${vlmError instanceof Error ? vlmError.message : String(vlmError)}`)
-            console.warn('Sistem metin chunks ile devam ediyor (gorsel analiz atlandi)')
+            console.error(`❌ VLM analizi BAŞARIŞIZ: ${vlmError instanceof Error ? vlmError.message : String(vlmError)}`)
+            throw vlmError  // ← THROW et, upload başarısız olsun
           }
         } 
         else if (ext === '.xlsx' || ext === '.xls') {
@@ -220,16 +227,20 @@ export async function POST(req: NextRequest) {
     // Tüm chunk'ları veritabanına insert et
     let insertedCount = 0
     
-    // 🆔 Her dosya grubu için file_id'yi bir kez belirle
+    // 🆔 Her dosya grubu için file_id'yi bir kez belirle (BAŞI'NDA)
+    // Döngü içinde MAX sorgusu çalıştırırsan, her döngüde sonuç değişebilir
     const fileIdMap = new Map<string, number>()
+    const maxFileIdResult = await pool.query(
+      'SELECT COALESCE(MAX(file_id), 0) as max_file_id FROM documents WHERE user_id = $1',
+      [userId]
+    )
+    let nextFileId = (maxFileIdResult.rows[0]?.max_file_id ?? 0) + 1
+    
     for (const [file, ] of fileMap.entries()) {
-      // Bu dosya için file_id'yi belirle (MAX + 1)
-      const result = await pool.query(
-        'SELECT COALESCE(MAX(file_id), 0) + 1 as next_file_id FROM documents WHERE user_id = $1',
-        [userId]
-      )
-      fileIdMap.set(file, result.rows[0].next_file_id)
-      console.log(`📁 ${file}: file_id = ${result.rows[0].next_file_id}`)
+      // Her dosyaya sırayla artan file_id ver
+      fileIdMap.set(file, nextFileId)
+      console.log(`📁 ${file}: file_id = ${nextFileId}`)
+      nextFileId++  // Sonraki dosya için ID'yi artır
     }
     
     for (let i = 0; i < splitDocs.length; i++) {

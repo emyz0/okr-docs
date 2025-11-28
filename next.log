@@ -8,5 +8,6 @@
    - Environments: .env.local
 
  ✓ Starting...
- ✓ Ready in 18.9s
+ ✓ Ready in 610ms
+ GET / 200 in 1228ms (compile: 1180ms, render: 48ms)
 [?25h
