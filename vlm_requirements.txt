@@ -6,4 +6,4 @@ huggingface-hub>=0.16.0
 python-dotenv>=1.0.0
 pillow
 numpy
-
+bitsandbytes>=0.41.0

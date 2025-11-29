@@ -108,6 +108,9 @@ export default function Home() {
   
   // loadingPdfs: PDF listesi yükleniyor mu? (yükleme animasyonu için)
   const [loadingPdfs, setLoadingPdfs] = useState(true);
+  
+  // pdfSearchQuery: PDF listesinde arama için
+  const [pdfSearchQuery, setPdfSearchQuery] = useState('');
 
   // ===== SAYFA YÜKLENMEĞINDE PDF'LERİ GETIR =====
   // useEffect: Bileşen DOM'a eklendiğinde bir kere çalışır (boş dependency array)
@@ -474,8 +477,21 @@ export default function Home() {
                 <p className="text-gray-400 text-sm">Henüz dosya yüklenmemiş</p>
               ) : (
                 // Dosyaların checkbox listesi
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {availablePdfs.map((pdf) => (
+                <div className="space-y-4">
+                  {/* 🔍 ARAMA BOX */}
+                  <input
+                    type="text"
+                    placeholder="🔍 Dosya adı ile ara..."
+                    value={pdfSearchQuery}
+                    onChange={(e) => setPdfSearchQuery(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 transition"
+                  />
+                  
+                  {/* FİLTRELENMİŞ DOSYA LİSTESİ */}
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {availablePdfs
+                      .filter(pdf => pdf.name.toLowerCase().includes(pdfSearchQuery.toLowerCase()))
+                      .map((pdf) => (
                     // Her PDF için checkbox
                     <label key={pdf.name} className="flex items-center p-3 bg-slate-700/50 rounded cursor-pointer hover:bg-slate-700/70 transition">
                       {/* CHECKBOX */}
@@ -499,13 +515,15 @@ export default function Home() {
                       </div>
                     </label>
                   ))}
+                  </div>
+                  
+                  {/* Kaç PDF seçildiğini göster + filtreleme sonucu */}
+                  <p className="text-xs text-gray-500 mt-3">
+                    Seçili: {selectedPdfs.length} / {availablePdfs
+                      .filter(pdf => pdf.name.toLowerCase().includes(pdfSearchQuery.toLowerCase())).length}
+                  </p>
                 </div>
               )}
-              
-              {/* Kaç PDF seçildiğini göster */}
-              <p className="text-xs text-gray-500 mt-3">
-                Seçili: {selectedPdfs.length} / {availablePdfs.length}
-              </p>
             </div>
           </div>
 

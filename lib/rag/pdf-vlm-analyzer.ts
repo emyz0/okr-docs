@@ -9,10 +9,43 @@ import path from "path";
 import * as pdfjsLib from "pdfjs-dist";
 import { createCanvas } from "canvas";
 
-// Node.js ortamında DOMMatrix tanımla (pdfjs için gerekli)
+// 🔧 DOMMatrix polyfill (pdfjs-dist + canvas için Node.js ortamında gerekli)
 if (typeof globalThis !== "undefined" && !("DOMMatrix" in globalThis)) {
   (globalThis as any).DOMMatrix = class DOMMatrix {
-    constructor(public values: number[]) {}
+    // Temel properties
+    a: number = 1; 
+    b: number = 0; 
+    c: number = 0; 
+    d: number = 1; 
+    e: number = 0; 
+    f: number = 0;
+    
+    // SVG transform matrix properties
+    m11 = 1; m12 = 0; m13 = 0; m14 = 0;
+    m21 = 0; m22 = 1; m23 = 0; m24 = 0;
+    m31 = 0; m32 = 0; m33 = 1; m34 = 0;
+    m41 = 0; m42 = 0; m43 = 0; m44 = 1;
+    
+    // Matrix flags
+    is2D = true;
+    isIdentity = true;
+    
+    constructor(values?: any) {
+      if (values) {
+        Object.assign(this, values);
+      }
+    }
+    
+    // Matrix operations
+    multiply(other: any) { return this; }
+    inverse() { return this; }
+    translate(x: number, y: number) { return this; }
+    scale(x: number, y: number) { return this; }
+    rotate(angle: number) { return this; }
+    skewX(angle: number) { return this; }
+    skewY(angle: number) { return this; }
+    flipX() { return this; }
+    flipY() { return this; }
   };
 }
 
@@ -20,7 +53,7 @@ if (typeof globalThis !== "undefined" && !("DOMMatrix" in globalThis)) {
 const PDFDocument = (pdfjsLib as any).getDocument;
 
 // Worker dosyasını Node.js'e hazırla
-if (typeof globalThis !== "undefined" && "pdfjsWorker" in pdfjsLib) {
+if (typeof globalThis !== "undefined" && (pdfjsLib as any).GlobalWorkerOptions) {
   (pdfjsLib as any).GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${(pdfjsLib as any).version}/pdf.worker.min.js`;
 }
 

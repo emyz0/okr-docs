@@ -68,45 +68,75 @@ export async function POST(req: NextRequest) {
     // ===== RERANKING: QWEN3 RERANKER-4B İLE EN İLGİLİ KAYNAKLAR SEÇ =====
     // Vector similarity iyi sonuç verse de, Qwen reranking daha doğru sonuçlar verir
     // 10 dokuman içinden gerçekten soruya cevap verecek olanları seç
-    console.log("🔄 Reranking başladı...");
+    const separator = "=".repeat(80);
+    console.log("\n" + separator);
+    console.log("🔍 QUERY DEBUG INFO");
+    console.log(separator);
+    console.log("📌 SORU:", question);
+    console.log("👤 USER ID:", userId);
+    console.log("📄 Toplam vector match:", result.rows.length);
+    
+    // TOP 5 CHUNK'I (RERANKING ÖNCESI)
+    console.log("\n📊 TOP 5 VECTOR MATCH (RERANKING ÖNCESİ):");
+    result.rows.slice(0, 5).forEach((r: any, i: number) => {
+      console.log(`  ${i + 1}. [${r.metadata?.source || 'unknown'}] ${r.content.substring(0, 80)}...`);
+    });
+    
+    console.log("\n🔄 Reranking başladı...");
     
     let rerankResults: any[] = [];
     
+    // ✅ RERANKER SUNUCUSUNA GERÇEK ÇAĞRI YAP
     try {
-      // Qwen local server'a gönder
-      const qwenResponse = await fetch("http://localhost:8000/rerank", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: question,
-          documents: result.rows.map((r: any) => r.content.substring(0, 500)),
-          top_k: Math.min(result.rows.length, 10),
-        }),
+      const rerankerPayload = {
+        query: question,
+        documents: result.rows.map(r => r.content),
+        top_k: 10
+      };
+      
+      console.log(`  📤 Reranker'a gönderiliyor: ${result.rows.length} dokuman...`);
+      
+      // Promise.race ile timeout simüle et (AbortSignal.timeout uyumluluk için)
+      const rerankerPromise = fetch('http://localhost:8000/rerank', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rerankerPayload)
       });
       
-      if (!qwenResponse.ok) {
-        throw new Error(`Qwen server hatası: ${qwenResponse.status}`);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Reranker timeout (180s)')), 180000)
+      );
+      
+      const rerankerResponse = await Promise.race([rerankerPromise, timeoutPromise]) as Response;
+      
+      if (!rerankerResponse.ok) {
+        throw new Error(`Reranker HTTP ${rerankerResponse.status}`);
       }
       
-      const qwenData = await qwenResponse.json();
-      // Qwen'den gelen sonuçları NextResponse formatına dönüştür
-      rerankResults = qwenData.ranked_documents.map((doc: any) => ({
-        index: doc.index,
-        relevance_score: doc.score,
-      }));
+      const rerankerData = await rerankerResponse.json();
+      rerankResults = rerankerData.ranked_documents || [];
       
-      console.log("✅ Qwen reranker başarılı");
-    } catch (qwenError: any) {
-      console.warn("⚠️ Qwen reranker kullanılamadı, vector similarity sonuçlarını kullanıyoruz:", qwenError.message);
+      console.log(`✅ Qwen reranker başarılı: ${rerankResults.length} ranked dokuman`);
+    } catch (rerankerError: any) {
+      console.warn(`⚠️ Qwen reranker kullanılamadı: ${rerankerError.message}`);
+      console.warn("⚠️ Vector similarity sonuçları kullanılıyor (fallback)");
       
-      // Fallback: Qwen server kapalıysa vector similarity sonuçlarını kullan
-      // Her dokuman'ı sırasıyla rerank result'a çevir
+      // Fallback: Vector similarity sonuçlarını kullan
       rerankResults = result.rows.map((_, i: number) => ({
         index: i,
         relevance_score: 1 - i * 0.05, // Yaklaşık puanlama (0.95, 0.90, 0.85...)
       }));
-      console.log("⚠️ Vector similarity sonuçları kullanılıyor (Qwen server down)");
     }
+    
+    // TOP 5 RERANKED SONUÇLARI GÖSTER
+    console.log("\n🏆 TOP 5 RERANKED (QWEN SKORU İLE):");
+    rerankResults.slice(0, 5).forEach((rr: any, i: number) => {
+      const r = result.rows[rr.index];
+      const score = rr.relevance_score !== undefined ? rr.relevance_score : rr.score;
+      console.log(`  ${i + 1}. SCORE: ${(score * 100).toFixed(1)}% | [${r.metadata?.source || 'unknown'}] ${r.content.substring(0, 70)}...`);
+    });
+    
+    console.log("\n" + separator);
 
     // ===== HER PDF'DEN KAYNAKLAR SEÇ =====
     // Amaç: Her PDF'den en az 1 dokuman alsın (tüm kaynaklar temsil edilsin)

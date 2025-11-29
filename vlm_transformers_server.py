@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """
-🖼️ QWEN2.5-VL-7B-INSTRUCT + LOKAL TRANSFORMERS
+🖼️ QWEN2.5-VL-7B-INSTRUCT + LOKAL TRANSFORMERS (4-bit quantized)
 Lokal GPU/CPU üzerinde FastAPI inference server
 HF Inference API gerektirmez
+
+🔧 QUANTIZATION: 4-bit quantization ile RAM kullanımı ~16GB → ~4GB
 """
 
 import os
@@ -13,7 +15,7 @@ import torch
 from PIL import Image
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from transformers import AutoProcessor, AutoModelForVision2Seq
+from transformers import AutoProcessor, AutoModelForVision2Seq, BitsAndBytesConfig
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("vlm")
@@ -22,7 +24,7 @@ MODEL_ID = "Qwen/Qwen2.5-VL-7B-Instruct"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 TORCH_DTYPE = torch.float16 if torch.cuda.is_available() else torch.float32
 
-app = FastAPI(title="Qwen2.5-VL-7B (Lokal)", version="1.0")
+app = FastAPI(title="Qwen2.5-VL-7B (Lokal 4-bit)", version="1.0")
 
 class VLMRequest(BaseModel):
     image_base64: str
@@ -41,33 +43,55 @@ processor = None
 
 
 # --------------------------------------------------------
-# MODEL YÜKLEME
+# MODEL YÜKLEME (4-BIT QUANTIZATION İLE)
 # --------------------------------------------------------
 def init_model():
-    """Model ve processor'ü lokal olarak yükle"""
+    """Model ve processor'ü 4-bit quantization'la yükle (CPU RAM optimizasyonu)"""
     global model, processor
     try:
         logger.info(f"📥 Model indiriliyor / yükleniyor: {MODEL_ID}")
         logger.info(f"📟 Device: {DEVICE} | Dtype: {TORCH_DTYPE}")
+        logger.info(f"🔧 4-bit Quantization AÇIK (RAM: ~16GB → ~4GB)")
 
         processor = AutoProcessor.from_pretrained(MODEL_ID, trust_remote_code=True)
 
+        # 4-bit quantization config (CPU/GPU uyumlu)
+        quantization_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",  # Normal float 4-bit
+            bnb_4bit_use_double_quant=True,  # Double quantization (RAM düşürür)
+            bnb_4bit_compute_dtype=torch.float16,  # Compute dtype
+        )
+
         model = AutoModelForVision2Seq.from_pretrained(
             MODEL_ID,
-            torch_dtype=TORCH_DTYPE,
-            device_map="auto" if DEVICE == "cuda" else None,
+            quantization_config=quantization_config,
+            device_map="auto" if DEVICE == "cuda" else "cpu",
             trust_remote_code=True
         )
 
-        if DEVICE == "cpu":
-            model.to("cpu")
-
-        logger.info(f"✅ Model yüklendi ve hazır")
+        logger.info(f"✅ Model yüklendi ve hazır (4-bit quantized)")
         return True
 
     except Exception as e:
         logger.error(f"❌ Model yükleme hatası: {e}")
-        return False
+        logger.info(f"💡 Fallback: 4-bit quantization olmadan yüklemeyi dene...")
+        try:
+            # Fallback: quantization olmadan
+            model = AutoModelForVision2Seq.from_pretrained(
+                MODEL_ID,
+                torch_dtype=TORCH_DTYPE,
+                device_map="auto" if DEVICE == "cuda" else None,
+                trust_remote_code=True
+            )
+            if DEVICE == "cpu":
+                model.to("cpu")
+            logger.info(f"⚠️ Model yüklendi (quantization olmadan)")
+            return True
+        except Exception as fallback_error:
+            logger.error(f"❌ Fallback de başarısız: {fallback_error}")
+            return False
+
 
 
 @app.on_event("startup")

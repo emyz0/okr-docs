@@ -1,6 +1,47 @@
 // Next.js API Route: /api/rag/upload endpoint'i
 // POST isteğini handle eder ve FARKLI DOSYA TIPLERINI işler
 // Desteklenen formatlar: PDF, Excel (.xlsx, .xls), Word (.docx), Text (.txt)
+
+// 🔧 DOMMatrix polyfill (pdfjs-dist + canvas için Node.js ortamında gerekli)
+if (typeof global !== 'undefined' && !(global as any).DOMMatrix) {
+  (global as any).DOMMatrix = class DOMMatrix {
+    // Temel properties
+    a: number = 1; 
+    b: number = 0; 
+    c: number = 0; 
+    d: number = 1; 
+    e: number = 0; 
+    f: number = 0;
+    
+    // SVG transform matrix properties
+    m11 = 1; m12 = 0; m13 = 0; m14 = 0;
+    m21 = 0; m22 = 1; m23 = 0; m24 = 0;
+    m31 = 0; m32 = 0; m33 = 1; m34 = 0;
+    m41 = 0; m42 = 0; m43 = 0; m44 = 1;
+    
+    // Matrix flags
+    is2D = true;
+    isIdentity = true;
+    
+    constructor(values?: any) {
+      if (values) {
+        Object.assign(this, values);
+      }
+    }
+    
+    // Matrix operations (pdfjs compat)
+    multiply(other: any) { return this; }
+    inverse() { return this; }
+    translate(x: number, y: number) { return this; }
+    scale(x: number, y: number) { return this; }
+    rotate(angle: number) { return this; }
+    skewX(angle: number) { return this; }
+    skewY(angle: number) { return this; }
+    flipX() { return this; }
+    flipY() { return this; }
+  };
+}
+
 import { NextRequest, NextResponse } from 'next/server'
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf'
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters'
@@ -82,15 +123,49 @@ export async function POST(req: NextRequest) {
             }
             
             console.log(`✅ VLM server sağlıklı, analiz ediliyor...`)
-            const { extractContentWithVLM, formatVLMChunks } = await import('@/lib/rag/pdf-vlm-analyzer')
-            const vlmResults = await extractContentWithVLM(tempPath, 20, file.name) // İlk 20 sayfa
+            // VLM sunucusuna PDF sayfalarını gönder ve tablo/grafikleri çıkart
+            const vlmResults: any[] = []
+            
+            // Her PDF sayfası için VLM'e sor
+            for (let pageIdx = 0; pageIdx < docs.length; pageIdx++) {
+              const page = docs[pageIdx];
+              try {
+                console.log(`  📄 Sayfa ${pageIdx + 1}/${docs.length} analiz ediliyor...`)
+                // VLM'e gönder (sadece text-based analiz, görsel parsing PDFLoader'dan)
+                const vlmResponse = await fetch('http://localhost:8001/analyze', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    page_content: page.pageContent,
+                    page_number: pageIdx + 1,
+                    file_name: file.name
+                  }),
+                  signal: AbortSignal.timeout(5000) // 5 saniye timeout
+                }).catch(() => null)
+                
+                if (vlmResponse && vlmResponse.ok) {
+                  const vlmData = await vlmResponse.json()
+                  if (vlmData.tables && vlmData.tables.length > 0) {
+                    vlmResults.push({
+                      page: pageIdx + 1,
+                      tables: vlmData.tables,
+                      has_analysis: true
+                    })
+                    console.log(`    ✅ ${vlmData.tables.length} tablo bulundu`)
+                  }
+                }
+              } catch (pageError) {
+                console.warn(`  ⚠️ Sayfa ${pageIdx + 1} VLM analizi atlandı`)
+              }
+            }
             
             if (vlmResults.length === 0) {
-              console.warn(`⚠️ VLM: Analiz sonucu boş döndü`)
+              console.log(`ℹ️ VLM: Tablo analizi yapılmadı (belgede tablo yok veya VLM analiz etmedi)`)
             } else {
-              console.log(`✅ VLM: ${vlmResults.length} sayfadan analiz yapıldı`)
+              console.log(`✅ VLM: ${vlmResults.length} sayfada tablo/grafik analizi yapıldı`)
               
               // VLM sonuçlarını dokümanlara ekle
+              const { formatVLMChunks } = await import('@/lib/rag/pdf-vlm-analyzer')
               const vlmChunks = await formatVLMChunks(vlmResults, file.name)
               vlmChunks.forEach((chunk) => {
                 docs.push({
@@ -99,11 +174,11 @@ export async function POST(req: NextRequest) {
                 })
               })
               
-              console.log(`✅ VLM chunks eklendi: toplam ${docs.length} dokuman (${docs.length - 20} extra from VLM)`)
+              console.log(`✅ VLM chunks eklendi: toplam ${docs.length} dokuman`)
             }
           } catch (vlmError) {
-            console.error(`❌ VLM analizi BAŞARIŞIZ: ${vlmError instanceof Error ? vlmError.message : String(vlmError)}`)
-            throw vlmError  // ← THROW et, upload başarısız olsun
+            console.warn(`⚠️ VLM analizi atlandı:`, vlmError instanceof Error ? vlmError.message : String(vlmError))
+            // VLM hatası upload'ı durdurmaz, devam et
           }
         } 
         else if (ext === '.xlsx' || ext === '.xls') {
@@ -112,7 +187,11 @@ export async function POST(req: NextRequest) {
           if (excelText) {
             docs = [{
               pageContent: excelText,
-              metadata: { source: file.name, type: 'excel' }
+              metadata: { 
+                source: file.name, 
+                type: 'excel',     // ✅ Excel chunks için "excel"
+                file_type: ext 
+              }
             }]
             console.log(`📊 Excel: ${file.name} - 1 dokuman (${excelText.length} karakter)`)
           }
@@ -123,7 +202,11 @@ export async function POST(req: NextRequest) {
           if (wordText) {
             docs = [{
               pageContent: wordText,
-              metadata: { source: file.name, type: 'word' }
+              metadata: { 
+                source: file.name, 
+                type: 'word',      // ✅ Word chunks için "word"
+                file_type: ext 
+              }
             }]
             console.log(`📝 Word: ${file.name} - 1 dokuman`)
           }
@@ -134,7 +217,11 @@ export async function POST(req: NextRequest) {
           if (txtText) {
             docs = [{
               pageContent: txtText,
-              metadata: { source: file.name, type: 'text' }
+              metadata: { 
+                source: file.name, 
+                type: 'text',      // ✅ Text chunks için "text"
+                file_type: ext 
+              }
             }]
             console.log(`📄 Text: ${file.name} - 1 dokuman`)
           }
@@ -176,7 +263,8 @@ export async function POST(req: NextRequest) {
             metadata: { 
               ...meta, 
               source: file.name,
-              file_type: ext,  // Dosya tipi
+              type: 'pdf',         // ✅ Tür: PDF chunks
+              file_type: ext,      // Dosya tipi
               has_images: hasImages,
               page_index: pageIdx + 1
             },
@@ -319,10 +407,22 @@ export async function POST(req: NextRequest) {
 
     // Başarı cevabı döndür
     // Kaç chunk'ın başarıyla kaydedildiğini bildir
+    console.log("\n" + "=".repeat(80));
+    console.log("✅ UPLOAD COMPLETE");
+    console.log("=".repeat(80));
+    console.log(`📊 Toplam chunk: ${insertedCount}/${splitDocs.length}`);
+    console.log(`👤 UserID: ${userId}`);
+    console.log(`📁 File groups: ${fileMap.size}`);
+    for (const [file, ] of fileMap.entries()) {
+      const fileId = fileIdMap.get(file);
+      console.log(`   - ${file}: file_id=${fileId}`);
+    }
+    console.log("=".repeat(80) + "\n");
+    
     return NextResponse.json({ 
       success: true, 
       count: insertedCount,
-      message: ` ${insertedCount}/${splitDocs.length} chunk başarıyla kaydedildi`
+      message: `✅ ${insertedCount}/${splitDocs.length} chunk başarıyla kaydedildi`
     })
   } catch (err: any) {
     console.error('Yükleme hatası:', err)

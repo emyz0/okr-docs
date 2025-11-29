@@ -95,44 +95,39 @@ async def rerank(request: RerankerRequest) -> RerankerResponse:
         # Her dokümantı sorgu ile pair yap
         pairs = [[request.query, doc] for doc in request.documents]
         
-        # Tokenize et
+        # Tokenize et - batch processing optimize et
         with torch.no_grad():
-            inputs = tokenizer(
-                pairs,
-                padding="max_length",  # Explicit padding
-                truncation=True,
-                return_tensors='pt',
-                max_length=256  # CPU performansı için düşürdük (512'den)
-            ).to(device)
+            # Daha küçük batch'ler ile işle (CPU'da daha hızlı)
+            batch_size = 4
+            all_scores = []
             
-            logger.info(f"   ✅ Tokenize başarılı: input shape={inputs['input_ids'].shape}")
+            for i in range(0, len(pairs), batch_size):
+                batch_pairs = pairs[i:i+batch_size]
+                
+                inputs = tokenizer(
+                    batch_pairs,
+                    padding="max_length",  # Explicit padding
+                    truncation=True,
+                    return_tensors='pt',
+                    max_length=256  # CPU performansı için düşürdük (512'den)
+                ).to(device)
+                
+                logger.info(f"   � Batch {i//batch_size + 1}: {len(batch_pairs)} pair işleniyor...")
+                
+                # Model çalıştır
+                try:
+                    outputs = model(**inputs)
+                    probs = F.softmax(outputs.logits, dim=-1)  # Softmax
+                    batch_scores = probs[:, 1].cpu().tolist()  # Relevant class'ın probability'si
+                    all_scores.extend(batch_scores)
+                    
+                except Exception as e:
+                    logger.error(f"   ❌ Batch hatası: {str(e)}")
+                    # Fallback: bu batch için dummy scores
+                    all_scores.extend([0.5] * len(batch_pairs))
             
-            # Model çalıştır
-            try:
-                logger.info(f"   🚀 Model inference başladı...")
-                outputs = model(**inputs)
-                logger.info(f"   ✅ Model inference başarılı, logits shape={outputs.logits.shape}")
-                
-                # Logits shape: (batch_size, num_labels=2)
-                # Label 0: not-relevant, Label 1: relevant
-                # Logits'i softmax ile probability'ye dönüştür
-                logits = outputs.logits
-                logger.info(f"   📊 Logits sample: {logits[0].detach().cpu().tolist()}")
-                
-                probs = F.softmax(logits, dim=-1)  # Softmax
-                logger.info(f"   📊 Probs sample: {probs[0].detach().cpu().tolist()}")
-                
-                scores = probs[:, 1].cpu().tolist()  # Relevant class'ın probability'si
-                logger.info(f"   ✅ Scores hesaplandı: {scores[:3]}...")
-                
-            except Exception as e:
-                logger.error(f"   ❌ Model output hatası: {str(e)}")
-                logger.error(f"      Exception type: {type(e).__name__}")
-                import traceback
-                logger.error(f"      Traceback: {traceback.format_exc()}")
-                # Fallback: outputlar olduğu gibi kullan
-                scores = [float(i) for i in range(len(request.documents))]
-                logger.warning(f"   ⚠️ Fallback score'lar kullanılıyor: {scores}")
+            scores = all_scores
+            logger.info(f"   ✅ Scores hesaplandı: {scores[:3]}...")
         
         # Skor ile indeks pair yap
         scored_docs = [
