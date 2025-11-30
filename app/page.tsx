@@ -433,19 +433,40 @@ export default function Home() {
               <h2 className="text-xl font-semibold text-white mb-4">📂 Dosyaları Yükle</h2>
               <div className="space-y-4">
                 {/* FILE INPUT: Çoklu dosya seçimine izin verir (PDF, Excel, Word, TXT) */}
-                <input
-                  key={uploadKey} // Key değiştiğinde input sıfırlanır (temizlenir)
-                  type="file"
-                  accept=".pdf,.xlsx,.xls,.docx,.txt" // PDF, Excel, Word, Text
-                  multiple // Birden fazla dosya aynı anda seçebil
-                  onChange={(e) => setPdfFiles(e.target.files)} // Seçilen dosyaları state'e kaydet
-                  className="block w-full text-sm text-gray-400
-                    file:mr-4 file:py-2 file:px-4
-                    file:rounded file:border-0
-                    file:text-sm file:font-semibold
-                    file:bg-purple-600 file:text-white
-                    hover:file:bg-purple-700"
-                />
+                <div 
+                  className="border-2 border-dashed border-purple-500/50 rounded-lg p-6 text-center cursor-pointer hover:border-purple-500 hover:bg-purple-500/5 transition"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.add('border-purple-500', 'bg-purple-500/10');
+                  }}
+                  onDragLeave={(e) => {
+                    e.currentTarget.classList.remove('border-purple-500', 'bg-purple-500/10');
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.remove('border-purple-500', 'bg-purple-500/10');
+                    setPdfFiles(e.dataTransfer.files);
+                  }}
+                >
+                  <input
+                    key={uploadKey}
+                    type="file"
+                    accept=".pdf,.xlsx,.xls,.docx,.txt"
+                    multiple
+                    onChange={(e) => setPdfFiles(e.target.files)}
+                    className="hidden"
+                    id="file-input"
+                  />
+                  <label htmlFor="file-input" className="block cursor-pointer">
+                    <p className="text-gray-300 text-sm">📁 Dosyaları buraya sürükle veya tıkla</p>
+                    <p className="text-gray-500 text-xs mt-1">PDF, Excel, Word, TXT desteklenir</p>
+                    {pdfFiles && pdfFiles.length > 0 && (
+                      <p className="text-purple-400 text-sm font-semibold mt-2">
+                        {pdfFiles.length} dosya seçildi
+                      </p>
+                    )}
+                  </label>
+                </div>
                 
                 {/* YÜKLE BUTONU */}
                 <button
@@ -478,14 +499,45 @@ export default function Home() {
               ) : (
                 // Dosyaların checkbox listesi
                 <div className="space-y-4">
-                  {/* 🔍 ARAMA BOX */}
-                  <input
-                    type="text"
-                    placeholder="🔍 Dosya adı ile ara..."
-                    value={pdfSearchQuery}
-                    onChange={(e) => setPdfSearchQuery(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 transition"
-                  />
+                  {/* 🔍 ARAMA BOX + SELECT ALL / DESELECT ALL BUTONLARI */}
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="🔍 Dosya adı ile ara..."
+                      value={pdfSearchQuery}
+                      onChange={(e) => setPdfSearchQuery(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 transition"
+                    />
+                    
+                    {/* SELECT ALL / DESELECT ALL BUTONLARI */}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const filteredNames = availablePdfs
+                            .filter(pdf => pdf.name.toLowerCase().includes(pdfSearchQuery.toLowerCase()))
+                            .map(pdf => pdf.name);
+                          setSelectedPdfs([...new Set([...selectedPdfs, ...filteredNames])]);
+                        }}
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm py-2 px-3 rounded transition"
+                      >
+                        ✓ Tümünü Seç
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const filteredNames = availablePdfs
+                            .filter(pdf => pdf.name.toLowerCase().includes(pdfSearchQuery.toLowerCase()))
+                            .map(pdf => pdf.name);
+                          setSelectedPdfs(selectedPdfs.filter(name => !filteredNames.includes(name)));
+                        }}
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm py-2 px-3 rounded transition"
+                      >
+                        ✗ Seçimi Kaldır
+                      </button>
+                    </div>
+                  </div>
                   
                   {/* FİLTRELENMİŞ DOSYA LİSTESİ */}
                   <div className="space-y-3 max-h-96 overflow-y-auto">
