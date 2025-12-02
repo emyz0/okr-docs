@@ -70,7 +70,7 @@ print("""
 │                                                                               │
 │ KONUM:        /Users/emirhanyilmaz/Desktop/okr-docs/vlm_server.py          │
 │ PORT:         8001                                                           │
-│ MODEL:        Qwen2-VL-32B-Instruct                                          │
+│ MODEL:        Qwen2.5-VL-7B-Instruct (Lokal, 4-bit Quantized)                       │
 │ PROVIDER:     HuggingFace Inference API (Cloud)                             │
 │ FRAMEWORK:    FastAPI                                                        │
 │                                                                               │
@@ -83,7 +83,7 @@ print("""
 │   1. Sunucu başlatılıyor (port 8001)                                        │
 │   2. HuggingFace API key kontrol ediliyor                                   │
 │   3. Gelen görsel base64 olarak alınıyor                                    │
-│   4. Görsel Qwen2-VL-32B-Instruct'a gönderiliyor                           │
+│   4. Görsel Qwen2.5-VL-7B-Instruct'a gönderiliyor (lokal, 4-bit)                   │
 │   5. Model görsel analiz ediyor:                                            │
 │      - "Bu resim tablo mı?"                                                 │
 │      - "Text mi, diagram mı?"                                               │
@@ -97,7 +97,7 @@ print("""
 │      Output: {analysis: "...", confidence: 0.95, extracted_text: "..."}   │
 │                                                                               │
 │   GET /health                                                                │
-│      Output: {status: "healthy", model: "Qwen2-VL-32B"}                   │
+│      Output: {status: "healthy", model: "Qwen2.5-VL-7B"}                   │
 │                                                                               │
 │ HATA HANDLING:                                                               │
 │   ├─ API key geçersiz → HTTP 401                                           │
@@ -490,7 +490,7 @@ OPSIYONEL FLOW: PDF Analysis
    │   └─ Her sayfa için image oluştur
    │
    ├─→ vlm_server.py'ye (port 8001) gönder
-   │   └─ Qwen2-VL-32B analiz ediyor
+   │   └─ Qwen2.5-VL-7B analiz ediyor (lokal, 4-bit)
    │
    ├─→ OCR + metadata oluştur
    │   └─ Tablo, diyagram, metin vs.

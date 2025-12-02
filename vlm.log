@@ -1,24 +1,0 @@
-/Users/emirhanyilmaz/Desktop/okr-docs/vlm_transformers_server.py:73: DeprecationWarning: 
-        on_event is deprecated, use lifespan event handlers instead.
-
-        Read more about it in the
-        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
-        
-  @app.on_event("startup")
-INFO:     Started server process [25464]
-INFO:     Waiting for application startup.
-INFO:vlm:🚀 VLM Server başlıyor...
-INFO:vlm:📥 Model indiriliyor / yükleniyor: Qwen/Qwen2.5-VL-7B-Instruct
-INFO:vlm:📟 Device: cpu | Dtype: torch.float32
-The image processor of type `Qwen2VLImageProcessor` is now loaded as a fast processor by default, even if the model checkpoint was saved with a slow processor. This is a breaking change and may produce slightly different outputs. To continue using the slow processor, instantiate this class with `use_fast=False`. Note that this behavior will be extended to all models in a future release.
-/Users/emirhanyilmaz/Desktop/okr-docs/vlm_env/lib/python3.14/site-packages/transformers/models/auto/modeling_auto.py:2284: FutureWarning: The class `AutoModelForVision2Seq` is deprecated and will be removed in v5.0. Please use `AutoModelForImageTextToText` instead.
-  warnings.warn(
-`torch_dtype` is deprecated! Use `dtype` instead!
-Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards:  20%|██        | 1/5 [00:13<00:55, 13.75s/it]Loading checkpoint shards:  40%|████      | 2/5 [00:46<01:15, 25.02s/it]Loading checkpoint shards:  60%|██████    | 3/5 [01:05<00:44, 22.36s/it]Loading checkpoint shards:  80%|████████  | 4/5 [01:25<00:21, 21.45s/it]Loading checkpoint shards: 100%|██████████| 5/5 [01:30<00:00, 15.42s/it]Loading checkpoint shards: 100%|██████████| 5/5 [01:30<00:00, 18.13s/it]
-INFO:vlm:✅ Model yüklendi ve hazır
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
-INFO:     127.0.0.1:50321 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:50384 - "GET /health HTTP/1.1" 200 OK
-/opt/homebrew/Cellar/python@3.14/3.14.0_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/multiprocessing/resource_tracker.py:297: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/mp-f74n8y5n'}
-  warnings.warn(
