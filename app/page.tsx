@@ -189,6 +189,34 @@ export default function Home() {
     }
   };
 
+  // 🆕 FUNCTION: Dosya listesine yeni dosya ekle (mevcut dosyaları koruyarak)
+  const addFilesToSelection = (newFiles: FileList | null) => {
+    if (!newFiles) return;
+    
+    // Mevcut dosya isimlerinin setini oluştur (duplikasyon kontrolü için)
+    const existingNames = pdfFiles ? Array.from(pdfFiles).map(f => f.name) : [];
+    
+    // Yeni dosyaları DataTransfer ile birleştir
+    const dt = new DataTransfer();
+    
+    // Eski dosyaları ekle
+    if (pdfFiles) {
+      Array.from(pdfFiles).forEach(file => {
+        dt.items.add(file);
+      });
+    }
+    
+    // Yeni dosyaları ekle (eğer zaten yoksa)
+    Array.from(newFiles).forEach(file => {
+      if (!existingNames.includes(file.name)) {
+        dt.items.add(file);
+      }
+    });
+    
+    // Birleştirilmiş FileList'i set et
+    setPdfFiles(dt.files);
+  };
+
   // ===== FUNCTION: PDF DOSYALARINI SUNUCUYA YÜKLE =====
   // Kullanıcının seçtiği PDF dosyalarını FormData ile upload eder
   const handlePDFUpload = async () => {
@@ -235,9 +263,9 @@ export default function Home() {
           fetchAvailablePdfs();
           // Section'ları refresh etmiyoruz - kullanıcı aktif konuşmasını korumak için
         }, 1000);
-        // File input'u tamamen sıfırla
+        // File input'u tamamen sıfırla (yeni dosya seçimini temizle)
         setPdfFiles(null);
-        // Key'i değiştirerek input DOM'dan çıkarılıp yeniden oluşturulsun (temizlik için)
+        // Key'i değiştirerek input DOM'dan çıkarılıp yeniden oluşturulsun (state sıfırlanması için)
         setUploadKey(prev => prev + 1);
       } else {
         // Hata varsa kullanıcıya göster
@@ -445,7 +473,7 @@ export default function Home() {
                   onDrop={(e) => {
                     e.preventDefault();
                     e.currentTarget.classList.remove('border-purple-500', 'bg-purple-500/10');
-                    setPdfFiles(e.dataTransfer.files);
+                    addFilesToSelection(e.dataTransfer.files);
                   }}
                 >
                   <input
@@ -453,7 +481,7 @@ export default function Home() {
                     type="file"
                     accept=".pdf,.xlsx,.xls,.docx,.txt"
                     multiple
-                    onChange={(e) => setPdfFiles(e.target.files)}
+                    onChange={(e) => addFilesToSelection(e.target.files)}
                     className="hidden"
                     id="file-input"
                   />
@@ -461,9 +489,42 @@ export default function Home() {
                     <p className="text-gray-300 text-sm">📁 Dosyaları buraya sürükle veya tıkla</p>
                     <p className="text-gray-500 text-xs mt-1">PDF, Excel, Word, TXT desteklenir</p>
                     {pdfFiles && pdfFiles.length > 0 && (
-                      <p className="text-purple-400 text-sm font-semibold mt-2">
-                        {pdfFiles.length} dosya seçildi
-                      </p>
+                      <div className="text-purple-400 text-sm font-semibold mt-3 p-3 bg-purple-900/20 rounded max-h-48 overflow-y-auto">
+                        <div className="flex justify-between items-center mb-2">
+                          <p>📋 Seçilen dosyalar ({pdfFiles.length}):</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPdfFiles(null);
+                              setUploadKey(prev => prev + 1);
+                            }}
+                            className="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded transition"
+                          >
+                            ✕ Temizle
+                          </button>
+                        </div>
+                        <ul className="space-y-1 text-xs">
+                          {Array.from(pdfFiles).map((file, idx) => (
+                            <li key={idx} className="text-purple-300 flex justify-between items-center group">
+                              <span>• {file.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const dt = new DataTransfer();
+                                  Array.from(pdfFiles).forEach((f, i) => {
+                                    if (i !== idx) dt.items.add(f);
+                                  });
+                                  setPdfFiles(dt.files.length > 0 ? dt.files : null);
+                                }}
+                                className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 text-lg transition"
+                                title="Dosyayı kaldır"
+                              >
+                                ✕
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
                   </label>
                 </div>
