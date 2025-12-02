@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
           docs = await loader.load()
           console.log(`📑 PDF: ${file.name} - ${docs.length} sayfa`)
           
-          // 🖼️ VLM ile görselleri ve tabloları analiz et (ZORUNLU - hem tablo hem grafik)
+          // 🖼️ VLM ile görselleri ve tabloları analiz et (OPSİYONEL - VLM fail olsa bile devam et)
           console.log(`🔍 VLM analizi başlanıyor...`)
           try {
             // VLM server'ı check et
@@ -119,69 +119,69 @@ export async function POST(req: NextRequest) {
               .catch(() => false)
             
             if (!healthCheck) {
-              throw new Error('VLM server 8001 portunda erişilemez')
-            }
-            
-            console.log(`✅ VLM server sağlıklı, analiz ediliyor...`)
-            // VLM sunucusuna PDF sayfalarını gönder ve tablo/grafikleri çıkart
-            const vlmResults: any[] = []
-            
-            // Her PDF sayfası için VLM'e sor
-            for (let pageIdx = 0; pageIdx < docs.length; pageIdx++) {
-              const page = docs[pageIdx];
-              try {
-                console.log(`  📄 Sayfa ${pageIdx + 1}/${docs.length} analiz ediliyor...`)
-                // VLM'e gönder (sadece text-based analiz, görsel parsing PDFLoader'dan)
-                const vlmResponse = await fetch('http://localhost:8001/analyze', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    page_content: page.pageContent,
-                    page_number: pageIdx + 1,
-                    file_name: file.name
-                  }),
-                  signal: AbortSignal.timeout(5000) // 5 saniye timeout
-                }).catch(() => null)
-                
-                if (vlmResponse && vlmResponse.ok) {
-                  const vlmData = await vlmResponse.json()
-                  if (vlmData.tables && vlmData.tables.length > 0) {
-                    vlmResults.push({
-                      page: pageIdx + 1,
-                      tables: vlmData.tables,
-                      has_analysis: true
-                    })
-                    console.log(`    ✅ ${vlmData.tables.length} tablo bulundu`)
-                  }
-                }
-              } catch (pageError) {
-                console.warn(`  ⚠️ Sayfa ${pageIdx + 1} VLM analizi atlandı`)
-              }
-            }
-            
-            if (vlmResults.length === 0) {
-              console.log(`ℹ️ VLM: Tablo analizi yapılmadı (belgede tablo yok veya VLM analiz etmedi)`)
+              console.warn(`⚠️ VLM server 8001 portunda erişilemez - VLM analizi atlandı`)
+              // VLM fail olsa bile devam et (error throw etme)
             } else {
-              console.log(`✅ VLM: ${vlmResults.length} sayfada tablo/grafik analizi yapıldı`)
+              console.log(`✅ VLM server sağlıklı, analiz ediliyor...`)
+              // VLM sunucusuna PDF sayfalarını gönder ve tablo/grafikleri çıkart
+              const vlmResults: any[] = []
               
-              // VLM sonuçlarını dokümanlara ekle
-              const { formatVLMChunks } = await import('@/lib/rag/pdf-vlm-analyzer')
-              const vlmChunks = await formatVLMChunks(vlmResults, file.name)
-              vlmChunks.forEach((chunk) => {
-                docs.push({
-                  pageContent: chunk.content,
-                  metadata: chunk.metadata
+              // Her PDF sayfası için VLM'e sor
+              for (let pageIdx = 0; pageIdx < docs.length; pageIdx++) {
+                const page = docs[pageIdx];
+                try {
+                  console.log(`  📄 Sayfa ${pageIdx + 1}/${docs.length} analiz ediliyor...`)
+                  // VLM'e gönder (sadece text-based analiz, görsel parsing PDFLoader'dan)
+                  const vlmResponse = await fetch('http://localhost:8001/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      page_content: page.pageContent,
+                      page_number: pageIdx + 1,
+                      file_name: file.name
+                    }),
+                    signal: AbortSignal.timeout(5000) // 5 saniye timeout
+                  }).catch(() => null)
+                  
+                  if (vlmResponse && vlmResponse.ok) {
+                    const vlmData = await vlmResponse.json()
+                    if (vlmData.tables && vlmData.tables.length > 0) {
+                      vlmResults.push({
+                        page: pageIdx + 1,
+                        tables: vlmData.tables,
+                        has_analysis: true
+                      })
+                      console.log(`    ✅ ${vlmData.tables.length} tablo bulundu`)
+                    }
+                  }
+                } catch (pageError) {
+                  console.warn(`  ⚠️ Sayfa ${pageIdx + 1} VLM analizi atlandı`)
+                }
+              }
+              
+              if (vlmResults.length === 0) {
+                console.log(`ℹ️ VLM: Tablo analizi yapılmadı (belgede tablo yok veya VLM analiz etmedi)`)
+              } else {
+                console.log(`✅ VLM: ${vlmResults.length} sayfada tablo/grafik analizi yapıldı`)
+                
+                // VLM sonuçlarını dokümanlara ekle
+                const { formatVLMChunks } = await import('@/lib/rag/pdf-vlm-analyzer')
+                const vlmChunks = await formatVLMChunks(vlmResults, file.name)
+                vlmChunks.forEach((chunk) => {
+                  docs.push({
+                    pageContent: chunk.content,
+                    metadata: chunk.metadata
+                  })
                 })
-              })
-              
-              console.log(`✅ VLM chunks eklendi: toplam ${docs.length} dokuman`)
+                
+                console.log(`✅ VLM chunks eklendi: toplam ${docs.length} dokuman`)
+              }
             }
           } catch (vlmError) {
             console.warn(`⚠️ VLM analizi atlandı:`, vlmError instanceof Error ? vlmError.message : String(vlmError))
             // VLM hatası upload'ı durdurmaz, devam et
           }
-        } 
-        else if (ext === '.xlsx' || ext === '.xls') {
+        } else if (ext === '.xlsx' || ext === '.xls') {
           // Excel işleme
           const excelText = await extractTextFromExcel(tempPath)
           if (excelText) {
@@ -318,16 +318,20 @@ export async function POST(req: NextRequest) {
     // 🆔 Her dosya grubu için file_id'yi bir kez belirle (BAŞI'NDA)
     // Döngü içinde MAX sorgusu çalıştırırsan, her döngüde sonuç değişebilir
     const fileIdMap = new Map<string, number>()
+    const fileChunkCountMap = new Map<string, number>()  // 📊 Her dosya için chunk sayısını tut
     const maxFileIdResult = await pool.query(
       'SELECT COALESCE(MAX(file_id), 0) as max_file_id FROM documents WHERE user_id = $1',
       [userId]
     )
     let nextFileId = (maxFileIdResult.rows[0]?.max_file_id ?? 0) + 1
     
-    for (const [file, ] of fileMap.entries()) {
+    for (const [file, fileDocs] of fileMap.entries()) {
       // Her dosyaya sırayla artan file_id ver
       fileIdMap.set(file, nextFileId)
-      console.log(`📁 ${file}: file_id = ${nextFileId}`)
+      // Bu dosyanın chunk sayısını say
+      const chunkCount = splitDocs.filter(doc => doc.metadata?.source === file).length
+      fileChunkCountMap.set(file, chunkCount)
+      console.log(`📁 ${file}: file_id = ${nextFileId}, chunks = ${chunkCount}`)
       nextFileId++  // Sonraki dosya için ID'yi artır
     }
     
@@ -405,19 +409,44 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 📊 Her dosya için başarılı insert sayısını hesapla
+    const fileInsertCountMap = new Map<string, number>()
+    for (const [file, ] of fileMap.entries()) {
+      fileInsertCountMap.set(file, 0)
+    }
+    
+    // Başarıyla kaydedilen chunk'ları saymak için bir sorgu daha yap
+    for (const [file, fileId] of fileIdMap.entries()) {
+      const countResult = await pool.query(
+        'SELECT COUNT(*) as count FROM documents WHERE user_id = $1 AND file_id = $2',
+        [userId, fileId]
+      )
+      fileInsertCountMap.set(file, countResult.rows[0]?.count ?? 0)
+    }
+
     // Başarı cevabı döndür
     // Kaç chunk'ın başarıyla kaydedildiğini bildir
-    console.log("\n" + "=".repeat(80));
-    console.log("✅ UPLOAD COMPLETE");
-    console.log("=".repeat(80));
-    console.log(`📊 Toplam chunk: ${insertedCount}/${splitDocs.length}`);
-    console.log(`👤 UserID: ${userId}`);
-    console.log(`📁 File groups: ${fileMap.size}`);
-    for (const [file, ] of fileMap.entries()) {
-      const fileId = fileIdMap.get(file);
-      console.log(`   - ${file}: file_id=${fileId}`);
+    console.log("\n" + "=".repeat(100));
+    console.log("✅ UPLOAD COMPLETE - DETAILED SUMMARY");
+    console.log("=".repeat(100));
+    console.log(`� UserID: ${userId}`);
+    console.log(`📁 Total files: ${fileMap.size}`);
+    console.log(`📊 Total chunks (before insert): ${splitDocs.length}`);
+    console.log(`✅ Total chunks (inserted): ${insertedCount}/${splitDocs.length}`);
+    console.log("\n� BREAKDOWN BY FILE:");
+    console.log("-".repeat(100));
+    
+    for (const [file, fileId] of fileIdMap.entries()) {
+      const expectedChunks = fileChunkCountMap.get(file) || 0;
+      const insertedChunks = fileInsertCountMap.get(file) || 0;
+      const status = insertedChunks === expectedChunks ? '✅' : '⚠️';
+      console.log(`${status} ${file}`);
+      console.log(`   → file_id: ${fileId}`);
+      console.log(`   → chunks: ${insertedChunks}/${expectedChunks}`);
     }
-    console.log("=".repeat(80) + "\n");
+    
+    console.log("-".repeat(100));
+    console.log("=".repeat(100) + "\n");
     
     return NextResponse.json({ 
       success: true, 

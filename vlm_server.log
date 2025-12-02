@@ -1,51 +1,24 @@
-/Users/emirhanyilmaz/Desktop/okr-docs/vlm_server.py:44: DeprecationWarning: 
+/Users/emirhanyilmaz/Desktop/okr-docs/vlm_transformers_server.py:73: DeprecationWarning: 
         on_event is deprecated, use lifespan event handlers instead.
 
         Read more about it in the
         [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
         
   @app.on_event("startup")
-INFO:     Started server process [92724]
+INFO:     Started server process [28843]
 INFO:     Waiting for application startup.
-INFO:__main__:🖼️ Qwen3-VL-4B-Instruct model yükleniyor...
-INFO:__main__:📍 Device: cpu
-Using `use_fast=True` but `torchvision` is not available. Falling back to the slow image processor.
-ERROR:__main__:❌ Model yükleme hatası: 
-AutoVideoProcessor requires the Torchvision library but it was not found in your environment. Check out the instructions on the
-installation page: https://pytorch.org/get-started/locally/ and follow the ones that match your environment.
-Please note that you may need to restart your runtime after installation.
-
-ERROR:    Traceback (most recent call last):
-  File "/Users/emirhanyilmaz/Desktop/okr-docs/vlm_env/lib/python3.14/site-packages/starlette/routing.py", line 677, in lifespan
-    async with self.lifespan_context(app) as maybe_state:
-               ~~~~~~~~~~~~~~~~~~~~~^^^^^
-  File "/Users/emirhanyilmaz/Desktop/okr-docs/vlm_env/lib/python3.14/site-packages/starlette/routing.py", line 566, in __aenter__
-    await self._router.startup()
-  File "/Users/emirhanyilmaz/Desktop/okr-docs/vlm_env/lib/python3.14/site-packages/starlette/routing.py", line 654, in startup
-    await handler()
-  File "/Users/emirhanyilmaz/Desktop/okr-docs/vlm_server.py", line 58, in load_model
-    processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
-  File "/Users/emirhanyilmaz/Desktop/okr-docs/vlm_env/lib/python3.14/site-packages/transformers/models/auto/processing_auto.py", line 396, in from_pretrained
-    return processor_class.from_pretrained(
-           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
-        pretrained_model_name_or_path, trust_remote_code=trust_remote_code, **kwargs
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-  File "/Users/emirhanyilmaz/Desktop/okr-docs/vlm_env/lib/python3.14/site-packages/transformers/processing_utils.py", line 1394, in from_pretrained
-    args = cls._get_arguments_from_pretrained(pretrained_model_name_or_path, **kwargs)
-  File "/Users/emirhanyilmaz/Desktop/okr-docs/vlm_env/lib/python3.14/site-packages/transformers/processing_utils.py", line 1453, in _get_arguments_from_pretrained
-    args.append(attribute_class.from_pretrained(pretrained_model_name_or_path, **kwargs))
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/emirhanyilmaz/Desktop/okr-docs/vlm_env/lib/python3.14/site-packages/transformers/utils/import_utils.py", line 2157, in __getattribute__
-    requires_backends(cls, cls._backends)
-    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
-  File "/Users/emirhanyilmaz/Desktop/okr-docs/vlm_env/lib/python3.14/site-packages/transformers/utils/import_utils.py", line 2143, in requires_backends
-    raise ImportError("".join(failed))
-ImportError: 
-AutoVideoProcessor requires the Torchvision library but it was not found in your environment. Check out the instructions on the
-installation page: https://pytorch.org/get-started/locally/ and follow the ones that match your environment.
-Please note that you may need to restart your runtime after installation.
-
-
-ERROR:    Application startup failed. Exiting.
+INFO:vlm:🚀 VLM Server başlıyor...
+INFO:vlm:📥 Model indiriliyor / yükleniyor: Qwen/Qwen2.5-VL-7B-Instruct
+INFO:vlm:📟 Device: cpu | Dtype: torch.float32
+The image processor of type `Qwen2VLImageProcessor` is now loaded as a fast processor by default, even if the model checkpoint was saved with a slow processor. This is a breaking change and may produce slightly different outputs. To continue using the slow processor, instantiate this class with `use_fast=False`. Note that this behavior will be extended to all models in a future release.
+/Users/emirhanyilmaz/Desktop/okr-docs/vlm_env/lib/python3.14/site-packages/transformers/models/auto/modeling_auto.py:2284: FutureWarning: The class `AutoModelForVision2Seq` is deprecated and will be removed in v5.0. Please use `AutoModelForImageTextToText` instead.
+  warnings.warn(
+`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:   0%|          | 0/5 [00:00<?, ?it/s]Loading checkpoint shards:  20%|██        | 1/5 [00:30<02:01, 30.38s/it]Loading checkpoint shards:  40%|████      | 2/5 [01:56<03:08, 62.90s/it]Loading checkpoint shards:  60%|██████    | 3/5 [02:47<01:55, 57.68s/it]Loading checkpoint shards:  80%|████████  | 4/5 [03:17<00:46, 46.59s/it]Loading checkpoint shards: 100%|██████████| 5/5 [03:29<00:00, 34.35s/it]Loading checkpoint shards: 100%|██████████| 5/5 [03:29<00:00, 41.96s/it]
+INFO:vlm:✅ Model yüklendi ve hazır
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [28843]
